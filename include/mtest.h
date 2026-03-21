@@ -188,7 +188,7 @@ extern mtest_state_t mtest_g;
     mtest_g.current_failed++;                                              \
     mtest_g.asserts_failed++;                                              \
     printf("    " MTEST_CLR_RED "%s:%d: " MTEST_CLR_RESET fmt "\n",       \
-           __FILE__, __LINE__, ##__VA_ARGS__);                             \
+           __FILE__, __LINE__, __VA_ARGS__);                               \
     return;                                                                \
 } while (0)
 
