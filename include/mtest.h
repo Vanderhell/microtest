@@ -48,6 +48,13 @@ typedef enum mtest_outcome {
     MTEST_OUTCOME_SETUP_FAILED
 } mtest_outcome_t;
 
+typedef enum mtest_phase {
+    MTEST_PHASE_IDLE = 0,
+    MTEST_PHASE_SETUP,
+    MTEST_PHASE_BODY,
+    MTEST_PHASE_TEARDOWN
+} mtest_phase_t;
+
 /* â”€â”€ Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /** Enable ANSI color output. */
@@ -105,6 +112,7 @@ typedef struct {
     const char     *current_suite;
     const char     *current_skip_reason;
     mtest_outcome_t current_outcome;
+    mtest_phase_t   current_phase;
     int             current_failed;     /* assertions failed in current test */
 
     /* Filtering */
@@ -165,6 +173,7 @@ extern mtest_state_t mtest_g;
     mtest_g.current_failed = 0;                                            \
     mtest_g.current_skip_reason = NULL;                                    \
     mtest_g.current_outcome = MTEST_OUTCOME_RUNNING;                       \
+    mtest_g.current_phase = MTEST_PHASE_BODY;                              \
     printf("  %-55s ", #name);                                             \
     fflush(stdout);                                                        \
     name();                                                                \
@@ -178,12 +187,16 @@ extern mtest_state_t mtest_g;
     mtest_g.current_test = NULL;                                           \
     mtest_g.current_skip_reason = NULL;                                    \
     mtest_g.current_outcome = MTEST_OUTCOME_NOT_RUN;                       \
+    mtest_g.current_phase = MTEST_PHASE_IDLE;                              \
     mtest_g.current_failed = 0;                                            \
 } while (0)
 
 /* â”€â”€ Setup / Teardown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-/** Run a test with setup and teardown functions. */
+/** Run a test with setup and teardown functions.
+ * Teardown always runs after setup, even when setup fails or skips, so partial
+ * fixture initialization can be cleaned up deterministically.
+ */
 #define MTEST_RUN_F(name, setup_fn, teardown_fn)  do {                    \
     mtest_g.tests_discovered++;                                            \
     if (mtest_g.stop_on_fail && mtest_g.tests_failed > 0) {                \
@@ -206,11 +219,26 @@ extern mtest_state_t mtest_g;
     mtest_g.current_failed = 0;                                            \
     mtest_g.current_skip_reason = NULL;                                    \
     mtest_g.current_outcome = MTEST_OUTCOME_RUNNING;                       \
+    mtest_g.current_phase = MTEST_PHASE_SETUP;                             \
+    mtest_outcome_t mtest_setup_outcome_ = MTEST_OUTCOME_RUNNING;          \
+    int mtest_body_ran_ = 0;                                               \
     printf("  %-55s ", #name);                                             \
     fflush(stdout);                                                        \
     setup_fn();                                                            \
-    name();                                                                \
+    mtest_setup_outcome_ = mtest_g.current_outcome;                         \
+    if (mtest_g.current_outcome == MTEST_OUTCOME_RUNNING) {                \
+        mtest_g.current_phase = MTEST_PHASE_BODY;                          \
+        mtest_body_ran_ = 1;                                               \
+        name();                                                            \
+    }                                                                      \
+    mtest_g.current_phase = MTEST_PHASE_TEARDOWN;                          \
     teardown_fn();                                                         \
+    if (mtest_setup_outcome_ == MTEST_OUTCOME_FAILED &&                    \
+        !mtest_body_ran_ &&                                                \
+        mtest_g.current_outcome == MTEST_OUTCOME_FAILED &&                 \
+        mtest_g.current_failed == 1) {                                     \
+        mtest_g.current_outcome = MTEST_OUTCOME_SETUP_FAILED;              \
+    }                                                                      \
     if (mtest_g.current_outcome == MTEST_OUTCOME_RUNNING) {                \
         mtest_g.current_outcome = MTEST_OUTCOME_PASSED;                    \
     }                                                                      \
@@ -221,6 +249,7 @@ extern mtest_state_t mtest_g;
     mtest_g.current_test = NULL;                                           \
     mtest_g.current_skip_reason = NULL;                                    \
     mtest_g.current_outcome = MTEST_OUTCOME_NOT_RUN;                       \
+    mtest_g.current_phase = MTEST_PHASE_IDLE;                              \
     mtest_g.current_failed = 0;                                            \
 } while (0)
 
@@ -373,6 +402,17 @@ extern mtest_state_t mtest_g;
 
 /** Skip current test. */
 #define MTEST_SKIP(reason) do {                                           \
+    if (mtest_g.current_phase == MTEST_PHASE_TEARDOWN) {                   \
+        mtest_g.current_outcome = MTEST_OUTCOME_FAILED;                    \
+        if (mtest_g.current_failed == 0) {                                 \
+            mtest_g.tests_failed++;                                        \
+        }                                                                  \
+        mtest_g.current_failed++;                                          \
+        printf(MTEST_CLR_RED "FAIL" MTEST_CLR_RESET "\n");                \
+        printf("    " MTEST_CLR_RED "%s:%d: teardown cannot skip: %s"     \
+               MTEST_CLR_RESET "\n", __FILE__, __LINE__, (reason));       \
+        return;                                                            \
+    }                                                                      \
     mtest_g.current_outcome = MTEST_OUTCOME_SKIPPED;                       \
     mtest_g.current_skip_reason = (reason);                                \
     printf(MTEST_CLR_YELLOW "SKIP" MTEST_CLR_RESET " (%s)\n", (reason)); \
