@@ -281,39 +281,58 @@ extern mtest_state_t mtest_g;
 /** Assert that two integers are NOT equal. */
 #define MTEST_ASSERT_NE(a, b) do {                                        \
     mtest_g.asserts_total++;                                               \
-    if ((long long)(a) == (long long)(b)) {                                \
-        MTEST_FAIL_("expected != %lld", (long long)(a));                  \
+    long long mtest_a_ = (long long)(a);                                   \
+    long long mtest_b_ = (long long)(b);                                   \
+    if (mtest_a_ == mtest_b_) {                                            \
+        MTEST_FAIL_("expected != %lld, got %lld", mtest_a_, mtest_b_);    \
     }                                                                      \
 } while (0)
 
 /** Assert a > b. */
 #define MTEST_ASSERT_GT(a, b) do {                                        \
     mtest_g.asserts_total++;                                               \
-    if (!((long long)(a) > (long long)(b))) {                              \
-        MTEST_FAIL_("%lld not > %lld", (long long)(a), (long long)(b));   \
+    long long mtest_a_ = (long long)(a);                                   \
+    long long mtest_b_ = (long long)(b);                                   \
+    if (!(mtest_a_ > mtest_b_)) {                                          \
+        MTEST_FAIL_("%lld not > %lld", mtest_a_, mtest_b_);               \
     }                                                                      \
 } while (0)
 
 /** Assert a >= b. */
 #define MTEST_ASSERT_GE(a, b) do {                                        \
     mtest_g.asserts_total++;                                               \
-    if (!((long long)(a) >= (long long)(b))) {                             \
-        MTEST_FAIL_("%lld not >= %lld", (long long)(a), (long long)(b));  \
+    long long mtest_a_ = (long long)(a);                                   \
+    long long mtest_b_ = (long long)(b);                                   \
+    if (!(mtest_a_ >= mtest_b_)) {                                         \
+        MTEST_FAIL_("%lld not >= %lld", mtest_a_, mtest_b_);              \
     }                                                                      \
 } while (0)
 
 /** Assert a < b. */
 #define MTEST_ASSERT_LT(a, b) do {                                        \
     mtest_g.asserts_total++;                                               \
-    if (!((long long)(a) < (long long)(b))) {                              \
-        MTEST_FAIL_("%lld not < %lld", (long long)(a), (long long)(b));   \
+    long long mtest_a_ = (long long)(a);                                   \
+    long long mtest_b_ = (long long)(b);                                   \
+    if (!(mtest_a_ < mtest_b_)) {                                          \
+        MTEST_FAIL_("%lld not < %lld", mtest_a_, mtest_b_);               \
+    }                                                                      \
+} while (0)
+
+/** Assert a <= b. */
+#define MTEST_ASSERT_LE(a, b) do {                                        \
+    mtest_g.asserts_total++;                                               \
+    long long mtest_a_ = (long long)(a);                                   \
+    long long mtest_b_ = (long long)(b);                                   \
+    if (!(mtest_a_ <= mtest_b_)) {                                         \
+        MTEST_FAIL_("%lld not <= %lld", mtest_a_, mtest_b_);             \
     }                                                                      \
 } while (0)
 
 /** Assert expression is true. */
 #define MTEST_ASSERT_TRUE(expr) do {                                      \
     mtest_g.asserts_total++;                                               \
-    if (!(expr)) {                                                         \
+    int mtest_expr_ = (expr);                                              \
+    if (!mtest_expr_) {                                                    \
         MTEST_FAIL_("expected true: %s", #expr);                          \
     }                                                                      \
 } while (0)
@@ -321,7 +340,8 @@ extern mtest_state_t mtest_g;
 /** Assert expression is false. */
 #define MTEST_ASSERT_FALSE(expr) do {                                     \
     mtest_g.asserts_total++;                                               \
-    if ((expr)) {                                                          \
+    int mtest_expr_ = (expr);                                              \
+    if (mtest_expr_) {                                                     \
         MTEST_FAIL_("expected false: %s", #expr);                         \
     }                                                                      \
 } while (0)
@@ -329,15 +349,17 @@ extern mtest_state_t mtest_g;
 /** Assert pointer is NULL. */
 #define MTEST_ASSERT_NULL(ptr) do {                                       \
     mtest_g.asserts_total++;                                               \
-    if ((ptr) != NULL) {                                                   \
-        MTEST_FAIL_("expected NULL, got %p", (void *)(ptr));              \
+    void *mtest_ptr_ = (void *)(ptr);                                      \
+    if (mtest_ptr_ != NULL) {                                              \
+        MTEST_FAIL_("expected NULL, got %p", mtest_ptr_);                 \
     }                                                                      \
 } while (0)
 
 /** Assert pointer is not NULL. */
 #define MTEST_ASSERT_NOT_NULL(ptr) do {                                   \
     mtest_g.asserts_total++;                                               \
-    if ((ptr) == NULL) {                                                   \
+    void *mtest_ptr_ = (void *)(ptr);                                      \
+    if (mtest_ptr_ == NULL) {                                              \
         MTEST_FAIL_("expected non-NULL: %s", #ptr);                       \
     }                                                                      \
 } while (0)
@@ -361,16 +383,29 @@ extern mtest_state_t mtest_g;
 /** Assert string contains substring. */
 #define MTEST_ASSERT_STR_CONTAINS(haystack, needle) do {                  \
     mtest_g.asserts_total++;                                               \
-    if (strstr((haystack), (needle)) == NULL) {                            \
-        MTEST_FAIL_("\"%s\" not found in output", (needle));              \
+    const char *mtest_h_ = (haystack);                                     \
+    const char *mtest_n_ = (needle);                                       \
+    if (mtest_h_ == NULL || mtest_n_ == NULL ||                            \
+        strstr(mtest_h_, mtest_n_) == NULL) {                              \
+        MTEST_FAIL_("\"%s\" not found in \"%s\"",                    \
+                    mtest_n_ ? mtest_n_ : "(null)",                      \
+                    mtest_h_ ? mtest_h_ : "(null)");                      \
     }                                                                      \
 } while (0)
 
 /** Assert two memory regions are equal. */
 #define MTEST_ASSERT_MEM_EQ(expected, actual, len) do {                   \
     mtest_g.asserts_total++;                                               \
-    if (memcmp((expected), (actual), (len)) != 0) {                        \
-        MTEST_FAIL_("memory mismatch (%d bytes)", (int)(len));            \
+    const void *mtest_e_ = (expected);                                     \
+    const void *mtest_a_ = (actual);                                       \
+    size_t mtest_len_ = (size_t)(len);                                     \
+    if (mtest_e_ == NULL || mtest_a_ == NULL) {                            \
+        if (mtest_e_ != mtest_a_) {                                        \
+            MTEST_FAIL_("memory mismatch (%zu bytes): expected %p, got %p",\
+                        mtest_len_, mtest_e_, mtest_a_);                  \
+        }                                                                  \
+    } else if (memcmp(mtest_e_, mtest_a_, mtest_len_) != 0) {              \
+        MTEST_FAIL_("memory mismatch (%zu bytes)", mtest_len_);           \
     }                                                                      \
 } while (0)
 

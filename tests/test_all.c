@@ -375,6 +375,380 @@ static int run_fixture_lifecycle_probe(void) {
     return ok;
 }
 
+typedef struct {
+    int a;
+    int b;
+    int c;
+} assertion_eval_state_t;
+
+static assertion_eval_state_t assertion_eval_state = {0, 0, 0};
+
+static void assertion_eval_reset(void) {
+    assertion_eval_state.a = 0;
+    assertion_eval_state.b = 0;
+    assertion_eval_state.c = 0;
+}
+
+static int assertion_eval_a_int(int value) {
+    assertion_eval_state.a++;
+    return value;
+}
+
+static int assertion_eval_b_int(int value) {
+    assertion_eval_state.b++;
+    return value;
+}
+
+static int assertion_eval_c_int(int value) {
+    assertion_eval_state.c++;
+    return value;
+}
+
+static void *assertion_eval_a_ptr(void *value) {
+    assertion_eval_state.a++;
+    return value;
+}
+
+static const char *assertion_eval_a_str(const char *value) {
+    assertion_eval_state.a++;
+    return value;
+}
+
+static const char *assertion_eval_b_str(const char *value) {
+    assertion_eval_state.b++;
+    return value;
+}
+
+static const unsigned char *assertion_eval_a_mem(const unsigned char *value) {
+    assertion_eval_state.a++;
+    return value;
+}
+
+static const unsigned char *assertion_eval_b_mem(const unsigned char *value) {
+    assertion_eval_state.b++;
+    return value;
+}
+
+static float assertion_eval_a_float(float value) {
+    assertion_eval_state.a++;
+    return value;
+}
+
+static float assertion_eval_b_float(float value) {
+    assertion_eval_state.b++;
+    return value;
+}
+
+static double assertion_eval_a_double(double value) {
+    assertion_eval_state.a++;
+    return value;
+}
+
+static double assertion_eval_b_double(double value) {
+    assertion_eval_state.b++;
+    return value;
+}
+
+static size_t assertion_eval_c_size(size_t value) {
+    assertion_eval_state.c++;
+    return value;
+}
+
+typedef void (*assertion_probe_fn_t)(void);
+
+#define ASSERTION_CASE(name, body) static void name(void) { body }
+
+static int assertion_eval_counts_match(int expected_a,
+                                       int expected_b,
+                                       int expected_c) {
+    return assertion_eval_state.a == expected_a &&
+           assertion_eval_state.b == expected_b &&
+           assertion_eval_state.c == expected_c;
+}
+
+ASSERTION_CASE(assertion_eq_pass,
+    MTEST_ASSERT_EQ(assertion_eval_a_int(7), assertion_eval_b_int(7));
+)
+
+ASSERTION_CASE(assertion_eq_fail,
+    MTEST_ASSERT_EQ(assertion_eval_a_int(7), assertion_eval_b_int(8));
+)
+
+ASSERTION_CASE(assertion_ne_pass,
+    MTEST_ASSERT_NE(assertion_eval_a_int(7), assertion_eval_b_int(8));
+)
+
+ASSERTION_CASE(assertion_ne_fail,
+    MTEST_ASSERT_NE(assertion_eval_a_int(7), assertion_eval_b_int(7));
+)
+
+ASSERTION_CASE(assertion_gt_pass,
+    MTEST_ASSERT_GT(assertion_eval_a_int(8), assertion_eval_b_int(7));
+)
+
+ASSERTION_CASE(assertion_gt_fail,
+    MTEST_ASSERT_GT(assertion_eval_a_int(7), assertion_eval_b_int(8));
+)
+
+ASSERTION_CASE(assertion_ge_pass,
+    MTEST_ASSERT_GE(assertion_eval_a_int(7), assertion_eval_b_int(7));
+)
+
+ASSERTION_CASE(assertion_ge_fail,
+    MTEST_ASSERT_GE(assertion_eval_a_int(7), assertion_eval_b_int(8));
+)
+
+ASSERTION_CASE(assertion_le_pass,
+    MTEST_ASSERT_LE(assertion_eval_a_int(7), assertion_eval_b_int(7));
+)
+
+ASSERTION_CASE(assertion_le_fail,
+    MTEST_ASSERT_LE(assertion_eval_a_int(8), assertion_eval_b_int(7));
+)
+
+ASSERTION_CASE(assertion_lt_pass,
+    MTEST_ASSERT_LT(assertion_eval_a_int(7), assertion_eval_b_int(8));
+)
+
+ASSERTION_CASE(assertion_lt_fail,
+    MTEST_ASSERT_LT(assertion_eval_a_int(8), assertion_eval_b_int(7));
+)
+
+ASSERTION_CASE(assertion_true_pass,
+    MTEST_ASSERT_TRUE(assertion_eval_a_int(1));
+)
+
+ASSERTION_CASE(assertion_true_fail,
+    MTEST_ASSERT_TRUE(assertion_eval_a_int(0));
+)
+
+ASSERTION_CASE(assertion_false_pass,
+    MTEST_ASSERT_FALSE(assertion_eval_a_int(0));
+)
+
+ASSERTION_CASE(assertion_false_fail,
+    MTEST_ASSERT_FALSE(assertion_eval_a_int(1));
+)
+
+static int assertion_null_value = 0;
+
+ASSERTION_CASE(assertion_null_pass,
+    MTEST_ASSERT_NULL(assertion_eval_a_ptr(NULL));
+)
+
+ASSERTION_CASE(assertion_null_fail,
+    MTEST_ASSERT_NULL(assertion_eval_a_ptr(&assertion_null_value));
+)
+
+ASSERTION_CASE(assertion_not_null_pass,
+    MTEST_ASSERT_NOT_NULL(assertion_eval_a_ptr(&assertion_null_value));
+)
+
+ASSERTION_CASE(assertion_not_null_fail,
+    MTEST_ASSERT_NOT_NULL(assertion_eval_a_ptr(NULL));
+)
+
+ASSERTION_CASE(assertion_str_eq_pass,
+    MTEST_ASSERT_STR_EQ(assertion_eval_a_str("alpha"),
+                        assertion_eval_b_str("alpha"));
+)
+
+ASSERTION_CASE(assertion_str_eq_fail,
+    MTEST_ASSERT_STR_EQ(assertion_eval_a_str("alpha"),
+                        assertion_eval_b_str("beta"));
+)
+
+ASSERTION_CASE(assertion_str_contains_pass,
+    MTEST_ASSERT_STR_CONTAINS(assertion_eval_a_str("hello world"),
+                              assertion_eval_b_str("world"));
+)
+
+ASSERTION_CASE(assertion_str_contains_fail,
+    MTEST_ASSERT_STR_CONTAINS(assertion_eval_a_str("hello world"),
+                              assertion_eval_b_str("mars"));
+)
+
+static const unsigned char assertion_mem_equal_a[] = {1, 2, 3, 4};
+static const unsigned char assertion_mem_equal_b[] = {1, 2, 3, 4};
+static const unsigned char assertion_mem_diff_b[] = {1, 2, 3, 5};
+
+ASSERTION_CASE(assertion_mem_eq_pass,
+    MTEST_ASSERT_MEM_EQ(assertion_eval_a_mem(assertion_mem_equal_a),
+                        assertion_eval_b_mem(assertion_mem_equal_b),
+                        assertion_eval_c_size(sizeof(assertion_mem_equal_a)));
+)
+
+ASSERTION_CASE(assertion_mem_eq_fail,
+    MTEST_ASSERT_MEM_EQ(assertion_eval_a_mem(assertion_mem_equal_a),
+                        assertion_eval_b_mem(assertion_mem_diff_b),
+                        assertion_eval_c_size(sizeof(assertion_mem_equal_a)));
+)
+
+ASSERTION_CASE(assertion_float_eq_pass,
+    MTEST_ASSERT_FLOAT_EQ(assertion_eval_a_float(1.25f),
+                          assertion_eval_b_float(1.25f));
+)
+
+ASSERTION_CASE(assertion_float_eq_fail,
+    MTEST_ASSERT_FLOAT_EQ(assertion_eval_a_float(1.25f),
+                          assertion_eval_b_float(1.5f));
+)
+
+ASSERTION_CASE(assertion_near_pass,
+    MTEST_ASSERT_NEAR(assertion_eval_a_double(10.0),
+                      assertion_eval_b_double(10.5),
+                      assertion_eval_c_int(1));
+)
+
+ASSERTION_CASE(assertion_near_fail,
+    MTEST_ASSERT_NEAR(assertion_eval_a_double(10.0),
+                      assertion_eval_b_double(12.5),
+                      assertion_eval_c_int(1));
+)
+
+static int run_assertion_single_eval_case(const char *name,
+                                          assertion_probe_fn_t fn,
+                                          int expected_a,
+                                          int expected_b,
+                                          int expected_c,
+                                          int expect_failed) {
+    int ok = 1;
+    mtest_state_t saved = mtest_g;
+
+    assertion_eval_reset();
+    memset(&mtest_g, 0, sizeof(mtest_g));
+    mtest_g.current_outcome = MTEST_OUTCOME_RUNNING;
+    mtest_g.current_phase = MTEST_PHASE_BODY;
+
+    fn();
+
+    if (!assertion_eval_counts_match(expected_a, expected_b, expected_c)) {
+        fprintf(stderr, "assertion single-eval counts mismatch for %s\n", name);
+        ok = 0;
+    }
+
+    if (mtest_g.tests_discovered != 0 ||
+        mtest_g.tests_selected != 0 ||
+        mtest_g.tests_run != 0 ||
+        mtest_g.tests_passed != 0 ||
+        mtest_g.tests_failed != expect_failed ||
+        mtest_g.tests_skipped != 0 ||
+        mtest_g.tests_filtered_out != 0 ||
+        mtest_g.suites_entered != 0 ||
+        mtest_g.asserts_total != 1 ||
+        mtest_g.asserts_failed != expect_failed ||
+        mtest_g.current_test != NULL ||
+        mtest_g.current_suite != NULL ||
+        mtest_g.current_skip_reason != NULL ||
+        mtest_g.current_outcome != (expect_failed ? MTEST_OUTCOME_FAILED
+                                                  : MTEST_OUTCOME_RUNNING) ||
+        mtest_g.current_phase != MTEST_PHASE_BODY ||
+        mtest_g.current_failed != expect_failed) {
+        fprintf(stderr, "assertion runner state mismatch for %s\n", name);
+        ok = 0;
+    }
+
+    mtest_g = saved;
+    return ok;
+}
+
+static int run_assertion_single_eval_probe(void) {
+    int ok = 1;
+
+    if (!run_assertion_single_eval_case("eq-pass", assertion_eq_pass, 1, 1, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("eq-fail", assertion_eq_fail, 1, 1, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("ne-pass", assertion_ne_pass, 1, 1, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("ne-fail", assertion_ne_fail, 1, 1, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("gt-pass", assertion_gt_pass, 1, 1, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("gt-fail", assertion_gt_fail, 1, 1, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("ge-pass", assertion_ge_pass, 1, 1, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("ge-fail", assertion_ge_fail, 1, 1, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("le-pass", assertion_le_pass, 1, 1, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("le-fail", assertion_le_fail, 1, 1, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("lt-pass", assertion_lt_pass, 1, 1, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("lt-fail", assertion_lt_fail, 1, 1, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("true-pass", assertion_true_pass, 1, 0, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("true-fail", assertion_true_fail, 1, 0, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("false-pass", assertion_false_pass, 1, 0, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("false-fail", assertion_false_fail, 1, 0, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("null-pass", assertion_null_pass, 1, 0, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("null-fail", assertion_null_fail, 1, 0, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("not-null-pass", assertion_not_null_pass, 1, 0, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("not-null-fail", assertion_not_null_fail, 1, 0, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("str-eq-pass", assertion_str_eq_pass, 1, 1, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("str-eq-fail", assertion_str_eq_fail, 1, 1, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("str-contains-pass", assertion_str_contains_pass, 1, 1, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("str-contains-fail", assertion_str_contains_fail, 1, 1, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("mem-eq-pass", assertion_mem_eq_pass, 1, 1, 1, 0)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("mem-eq-fail", assertion_mem_eq_fail, 1, 1, 1, 1)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("float-eq-pass", assertion_float_eq_pass, 1, 1, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("float-eq-fail", assertion_float_eq_fail, 1, 1, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("near-pass", assertion_near_pass, 1, 1, 1, 0)) {
+        ok = 0;
+    }
+    if (!run_assertion_single_eval_case("near-fail", assertion_near_fail, 1, 1, 1, 1)) {
+        ok = 0;
+    }
+
+    return ok;
+}
+
 MTEST_SUITE(misc) {
     MTEST_RUN(test_skip_example);
     MTEST_RUN(test_large_values);
@@ -481,6 +855,11 @@ int main(int argc, char **argv) {
     MTEST_SUITE_RUN(floats);
     MTEST_SUITE_RUN(fixtures);
     MTEST_SUITE_RUN(misc);
+    if (mtest_g.filter == NULL && !mtest_g.list_only && !mtest_g.stop_on_fail) {
+        if (!run_assertion_single_eval_probe()) {
+            return 1;
+        }
+    }
     if (mtest_g.filter == NULL && !mtest_g.list_only && !mtest_g.stop_on_fail) {
         if (!run_fixture_lifecycle_probe()) {
             return 1;
