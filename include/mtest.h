@@ -37,6 +37,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <math.h>
 
 typedef enum mtest_outcome {
@@ -268,63 +269,368 @@ extern mtest_state_t mtest_g;
     return;                                                                \
 } while (0)
 
+/* Legacy generic integer assertions compare via intmax_t. Unsigned values
+ * above INTMAX_MAX require the typed *_U64 assertions below.
+ */
+
 /** Assert that two integers are equal. */
 #define MTEST_ASSERT_EQ(expected, actual) do {                            \
     mtest_g.asserts_total++;                                               \
-    long long mtest_e_ = (long long)(expected);                            \
-    long long mtest_a_ = (long long)(actual);                              \
+    intmax_t mtest_e_ = (intmax_t)(expected);                              \
+    intmax_t mtest_a_ = (intmax_t)(actual);                                \
     if (mtest_e_ != mtest_a_) {                                            \
-        MTEST_FAIL_("expected %lld, got %lld", mtest_e_, mtest_a_);       \
+        MTEST_FAIL_("expected %" PRIdMAX ", got %" PRIdMAX,             \
+                    mtest_e_, mtest_a_);                                   \
     }                                                                      \
 } while (0)
 
 /** Assert that two integers are NOT equal. */
 #define MTEST_ASSERT_NE(a, b) do {                                        \
     mtest_g.asserts_total++;                                               \
-    long long mtest_a_ = (long long)(a);                                   \
-    long long mtest_b_ = (long long)(b);                                   \
+    intmax_t mtest_a_ = (intmax_t)(a);                                     \
+    intmax_t mtest_b_ = (intmax_t)(b);                                     \
     if (mtest_a_ == mtest_b_) {                                            \
-        MTEST_FAIL_("expected != %lld, got %lld", mtest_a_, mtest_b_);    \
+        MTEST_FAIL_("expected != %" PRIdMAX ", got %" PRIdMAX,         \
+                    mtest_a_, mtest_b_);                                   \
     }                                                                      \
 } while (0)
 
 /** Assert a > b. */
 #define MTEST_ASSERT_GT(a, b) do {                                        \
     mtest_g.asserts_total++;                                               \
-    long long mtest_a_ = (long long)(a);                                   \
-    long long mtest_b_ = (long long)(b);                                   \
+    intmax_t mtest_a_ = (intmax_t)(a);                                     \
+    intmax_t mtest_b_ = (intmax_t)(b);                                     \
     if (!(mtest_a_ > mtest_b_)) {                                          \
-        MTEST_FAIL_("%lld not > %lld", mtest_a_, mtest_b_);               \
+        MTEST_FAIL_("%" PRIdMAX " not > %" PRIdMAX,                     \
+                    mtest_a_, mtest_b_);                                   \
     }                                                                      \
 } while (0)
 
 /** Assert a >= b. */
 #define MTEST_ASSERT_GE(a, b) do {                                        \
     mtest_g.asserts_total++;                                               \
-    long long mtest_a_ = (long long)(a);                                   \
-    long long mtest_b_ = (long long)(b);                                   \
+    intmax_t mtest_a_ = (intmax_t)(a);                                     \
+    intmax_t mtest_b_ = (intmax_t)(b);                                     \
     if (!(mtest_a_ >= mtest_b_)) {                                         \
-        MTEST_FAIL_("%lld not >= %lld", mtest_a_, mtest_b_);              \
+        MTEST_FAIL_("%" PRIdMAX " not >= %" PRIdMAX,                   \
+                    mtest_a_, mtest_b_);                                   \
     }                                                                      \
 } while (0)
 
 /** Assert a < b. */
 #define MTEST_ASSERT_LT(a, b) do {                                        \
     mtest_g.asserts_total++;                                               \
-    long long mtest_a_ = (long long)(a);                                   \
-    long long mtest_b_ = (long long)(b);                                   \
+    intmax_t mtest_a_ = (intmax_t)(a);                                     \
+    intmax_t mtest_b_ = (intmax_t)(b);                                     \
     if (!(mtest_a_ < mtest_b_)) {                                          \
-        MTEST_FAIL_("%lld not < %lld", mtest_a_, mtest_b_);               \
+        MTEST_FAIL_("%" PRIdMAX " not < %" PRIdMAX,                     \
+                    mtest_a_, mtest_b_);                                   \
     }                                                                      \
 } while (0)
 
 /** Assert a <= b. */
 #define MTEST_ASSERT_LE(a, b) do {                                        \
     mtest_g.asserts_total++;                                               \
-    long long mtest_a_ = (long long)(a);                                   \
-    long long mtest_b_ = (long long)(b);                                   \
+    intmax_t mtest_a_ = (intmax_t)(a);                                     \
+    intmax_t mtest_b_ = (intmax_t)(b);                                     \
     if (!(mtest_a_ <= mtest_b_)) {                                         \
-        MTEST_FAIL_("%lld not <= %lld", mtest_a_, mtest_b_);             \
+        MTEST_FAIL_("%" PRIdMAX " not <= %" PRIdMAX,                   \
+                    mtest_a_, mtest_b_);                                   \
+    }                                                                      \
+} while (0)
+
+/** Assert two int32_t values are equal. */
+#define MTEST_ASSERT_EQ_I32(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    int32_t mtest_e_ = (int32_t)(expected);                                \
+    int32_t mtest_a_ = (int32_t)(actual);                                  \
+    if (mtest_e_ != mtest_a_) {                                            \
+        MTEST_FAIL_("expected %" PRId32 ", got %" PRId32,              \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_NE_I32(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    int32_t mtest_e_ = (int32_t)(expected);                                \
+    int32_t mtest_a_ = (int32_t)(actual);                                  \
+    if (mtest_e_ == mtest_a_) {                                            \
+        MTEST_FAIL_("expected != %" PRId32 ", got %" PRId32,            \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_GT_I32(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    int32_t mtest_e_ = (int32_t)(expected);                                \
+    int32_t mtest_a_ = (int32_t)(actual);                                  \
+    if (!(mtest_e_ > mtest_a_)) {                                          \
+        MTEST_FAIL_("%" PRId32 " not > %" PRId32,                       \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_GE_I32(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    int32_t mtest_e_ = (int32_t)(expected);                                \
+    int32_t mtest_a_ = (int32_t)(actual);                                  \
+    if (!(mtest_e_ >= mtest_a_)) {                                         \
+        MTEST_FAIL_("%" PRId32 " not >= %" PRId32,                     \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_LT_I32(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    int32_t mtest_e_ = (int32_t)(expected);                                \
+    int32_t mtest_a_ = (int32_t)(actual);                                  \
+    if (!(mtest_e_ < mtest_a_)) {                                          \
+        MTEST_FAIL_("%" PRId32 " not < %" PRId32,                       \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_LE_I32(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    int32_t mtest_e_ = (int32_t)(expected);                                \
+    int32_t mtest_a_ = (int32_t)(actual);                                  \
+    if (!(mtest_e_ <= mtest_a_)) {                                         \
+        MTEST_FAIL_("%" PRId32 " not <= %" PRId32,                     \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_EQ_U32(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    uint32_t mtest_e_ = (uint32_t)(expected);                              \
+    uint32_t mtest_a_ = (uint32_t)(actual);                                \
+    if (mtest_e_ != mtest_a_) {                                            \
+        MTEST_FAIL_("expected %" PRIu32 ", got %" PRIu32,              \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_NE_U32(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    uint32_t mtest_e_ = (uint32_t)(expected);                              \
+    uint32_t mtest_a_ = (uint32_t)(actual);                                \
+    if (mtest_e_ == mtest_a_) {                                            \
+        MTEST_FAIL_("expected != %" PRIu32 ", got %" PRIu32,            \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_GT_U32(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    uint32_t mtest_e_ = (uint32_t)(expected);                              \
+    uint32_t mtest_a_ = (uint32_t)(actual);                                \
+    if (!(mtest_e_ > mtest_a_)) {                                          \
+        MTEST_FAIL_("%" PRIu32 " not > %" PRIu32,                       \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_GE_U32(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    uint32_t mtest_e_ = (uint32_t)(expected);                              \
+    uint32_t mtest_a_ = (uint32_t)(actual);                                \
+    if (!(mtest_e_ >= mtest_a_)) {                                         \
+        MTEST_FAIL_("%" PRIu32 " not >= %" PRIu32,                     \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_LT_U32(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    uint32_t mtest_e_ = (uint32_t)(expected);                              \
+    uint32_t mtest_a_ = (uint32_t)(actual);                                \
+    if (!(mtest_e_ < mtest_a_)) {                                          \
+        MTEST_FAIL_("%" PRIu32 " not < %" PRIu32,                       \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_LE_U32(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    uint32_t mtest_e_ = (uint32_t)(expected);                              \
+    uint32_t mtest_a_ = (uint32_t)(actual);                                \
+    if (!(mtest_e_ <= mtest_a_)) {                                         \
+        MTEST_FAIL_("%" PRIu32 " not <= %" PRIu32,                     \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_EQ_I64(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    int64_t mtest_e_ = (int64_t)(expected);                                \
+    int64_t mtest_a_ = (int64_t)(actual);                                  \
+    if (mtest_e_ != mtest_a_) {                                            \
+        MTEST_FAIL_("expected %" PRId64 ", got %" PRId64,              \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_NE_I64(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    int64_t mtest_e_ = (int64_t)(expected);                                \
+    int64_t mtest_a_ = (int64_t)(actual);                                  \
+    if (mtest_e_ == mtest_a_) {                                            \
+        MTEST_FAIL_("expected != %" PRId64 ", got %" PRId64,            \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_GT_I64(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    int64_t mtest_e_ = (int64_t)(expected);                                \
+    int64_t mtest_a_ = (int64_t)(actual);                                  \
+    if (!(mtest_e_ > mtest_a_)) {                                          \
+        MTEST_FAIL_("%" PRId64 " not > %" PRId64,                       \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_GE_I64(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    int64_t mtest_e_ = (int64_t)(expected);                                \
+    int64_t mtest_a_ = (int64_t)(actual);                                  \
+    if (!(mtest_e_ >= mtest_a_)) {                                         \
+        MTEST_FAIL_("%" PRId64 " not >= %" PRId64,                     \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_LT_I64(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    int64_t mtest_e_ = (int64_t)(expected);                                \
+    int64_t mtest_a_ = (int64_t)(actual);                                  \
+    if (!(mtest_e_ < mtest_a_)) {                                          \
+        MTEST_FAIL_("%" PRId64 " not < %" PRId64,                       \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_LE_I64(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    int64_t mtest_e_ = (int64_t)(expected);                                \
+    int64_t mtest_a_ = (int64_t)(actual);                                  \
+    if (!(mtest_e_ <= mtest_a_)) {                                         \
+        MTEST_FAIL_("%" PRId64 " not <= %" PRId64,                     \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_EQ_U64(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    uint64_t mtest_e_ = (uint64_t)(expected);                              \
+    uint64_t mtest_a_ = (uint64_t)(actual);                                \
+    if (mtest_e_ != mtest_a_) {                                            \
+        MTEST_FAIL_("expected %" PRIu64 ", got %" PRIu64,              \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_NE_U64(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    uint64_t mtest_e_ = (uint64_t)(expected);                              \
+    uint64_t mtest_a_ = (uint64_t)(actual);                                \
+    if (mtest_e_ == mtest_a_) {                                            \
+        MTEST_FAIL_("expected != %" PRIu64 ", got %" PRIu64,            \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_GT_U64(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    uint64_t mtest_e_ = (uint64_t)(expected);                              \
+    uint64_t mtest_a_ = (uint64_t)(actual);                                \
+    if (!(mtest_e_ > mtest_a_)) {                                          \
+        MTEST_FAIL_("%" PRIu64 " not > %" PRIu64,                       \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_GE_U64(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    uint64_t mtest_e_ = (uint64_t)(expected);                              \
+    uint64_t mtest_a_ = (uint64_t)(actual);                                \
+    if (!(mtest_e_ >= mtest_a_)) {                                         \
+        MTEST_FAIL_("%" PRIu64 " not >= %" PRIu64,                     \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_LT_U64(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    uint64_t mtest_e_ = (uint64_t)(expected);                              \
+    uint64_t mtest_a_ = (uint64_t)(actual);                                \
+    if (!(mtest_e_ < mtest_a_)) {                                          \
+        MTEST_FAIL_("%" PRIu64 " not < %" PRIu64,                       \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_LE_U64(expected, actual) do {                         \
+    mtest_g.asserts_total++;                                               \
+    uint64_t mtest_e_ = (uint64_t)(expected);                              \
+    uint64_t mtest_a_ = (uint64_t)(actual);                                \
+    if (!(mtest_e_ <= mtest_a_)) {                                         \
+        MTEST_FAIL_("%" PRIu64 " not <= %" PRIu64,                     \
+                    mtest_e_, mtest_a_);                                   \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_EQ_SIZE(expected, actual) do {                        \
+    mtest_g.asserts_total++;                                               \
+    size_t mtest_e_ = (size_t)(expected);                                  \
+    size_t mtest_a_ = (size_t)(actual);                                    \
+    if (mtest_e_ != mtest_a_) {                                            \
+        MTEST_FAIL_("expected %zu, got %zu", mtest_e_, mtest_a_);        \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_NE_SIZE(expected, actual) do {                        \
+    mtest_g.asserts_total++;                                               \
+    size_t mtest_e_ = (size_t)(expected);                                  \
+    size_t mtest_a_ = (size_t)(actual);                                    \
+    if (mtest_e_ == mtest_a_) {                                            \
+        MTEST_FAIL_("expected != %zu, got %zu", mtest_e_, mtest_a_);    \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_GT_SIZE(expected, actual) do {                        \
+    mtest_g.asserts_total++;                                               \
+    size_t mtest_e_ = (size_t)(expected);                                  \
+    size_t mtest_a_ = (size_t)(actual);                                    \
+    if (!(mtest_e_ > mtest_a_)) {                                          \
+        MTEST_FAIL_("%zu not > %zu", mtest_e_, mtest_a_);                \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_GE_SIZE(expected, actual) do {                        \
+    mtest_g.asserts_total++;                                               \
+    size_t mtest_e_ = (size_t)(expected);                                  \
+    size_t mtest_a_ = (size_t)(actual);                                    \
+    if (!(mtest_e_ >= mtest_a_)) {                                         \
+        MTEST_FAIL_("%zu not >= %zu", mtest_e_, mtest_a_);              \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_LT_SIZE(expected, actual) do {                        \
+    mtest_g.asserts_total++;                                               \
+    size_t mtest_e_ = (size_t)(expected);                                  \
+    size_t mtest_a_ = (size_t)(actual);                                    \
+    if (!(mtest_e_ < mtest_a_)) {                                          \
+        MTEST_FAIL_("%zu not < %zu", mtest_e_, mtest_a_);                \
+    }                                                                      \
+} while (0)
+
+#define MTEST_ASSERT_LE_SIZE(expected, actual) do {                        \
+    mtest_g.asserts_total++;                                               \
+    size_t mtest_e_ = (size_t)(expected);                                  \
+    size_t mtest_a_ = (size_t)(actual);                                    \
+    if (!(mtest_e_ <= mtest_a_)) {                                         \
+        MTEST_FAIL_("%zu not <= %zu", mtest_e_, mtest_a_);              \
     }                                                                      \
 } while (0)
 

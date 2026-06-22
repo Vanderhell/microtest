@@ -749,6 +749,188 @@ static int run_assertion_single_eval_probe(void) {
     return ok;
 }
 
+static int32_t assertion_eval_a_i32(int32_t value) {
+    assertion_eval_state.a++;
+    return value;
+}
+
+static int32_t assertion_eval_b_i32(int32_t value) {
+    assertion_eval_state.b++;
+    return value;
+}
+
+static uint32_t assertion_eval_a_u32(uint32_t value) {
+    assertion_eval_state.a++;
+    return value;
+}
+
+static uint32_t assertion_eval_b_u32(uint32_t value) {
+    assertion_eval_state.b++;
+    return value;
+}
+
+static int64_t assertion_eval_a_i64(int64_t value) {
+    assertion_eval_state.a++;
+    return value;
+}
+
+static int64_t assertion_eval_b_i64(int64_t value) {
+    assertion_eval_state.b++;
+    return value;
+}
+
+static uint64_t assertion_eval_a_u64(uint64_t value) {
+    assertion_eval_state.a++;
+    return value;
+}
+
+static uint64_t assertion_eval_b_u64(uint64_t value) {
+    assertion_eval_state.b++;
+    return value;
+}
+
+static size_t assertion_eval_a_size(size_t value) {
+    assertion_eval_state.a++;
+    return value;
+}
+
+static size_t assertion_eval_b_size(size_t value) {
+    assertion_eval_state.b++;
+    return value;
+}
+
+ASSERTION_CASE(assertion_i32_eq_pass,
+    MTEST_ASSERT_EQ_I32(assertion_eval_a_i32(INT32_MIN),
+                        assertion_eval_b_i32(INT32_MIN));
+)
+
+ASSERTION_CASE(assertion_i32_eq_fail,
+    MTEST_ASSERT_EQ_I32(assertion_eval_a_i32(INT32_MIN),
+                        assertion_eval_b_i32(INT32_MAX));
+)
+
+ASSERTION_CASE(assertion_u32_ge_pass,
+    MTEST_ASSERT_GE_U32(assertion_eval_a_u32(UINT32_MAX),
+                        assertion_eval_b_u32(UINT32_MAX));
+)
+
+ASSERTION_CASE(assertion_u32_ge_fail,
+    MTEST_ASSERT_GE_U32(assertion_eval_a_u32(0),
+                        assertion_eval_b_u32(UINT32_MAX));
+)
+
+ASSERTION_CASE(assertion_i64_lt_pass,
+    MTEST_ASSERT_LT_I64(assertion_eval_a_i64(INT64_MIN),
+                        assertion_eval_b_i64(INT64_MAX));
+)
+
+ASSERTION_CASE(assertion_i64_lt_fail,
+    MTEST_ASSERT_LT_I64(assertion_eval_a_i64(INT64_MAX),
+                        assertion_eval_b_i64(INT64_MIN));
+)
+
+ASSERTION_CASE(assertion_u64_eq_pass,
+    MTEST_ASSERT_EQ_U64(assertion_eval_a_u64(UINT64_C(0x8000000000000000)),
+                        assertion_eval_b_u64(UINT64_C(0x8000000000000000)));
+)
+
+ASSERTION_CASE(assertion_u64_eq_fail,
+    MTEST_ASSERT_EQ_U64(assertion_eval_a_u64(UINT64_C(0x8000000000000000)),
+                        assertion_eval_b_u64(UINT64_MAX));
+)
+
+ASSERTION_CASE(assertion_size_le_pass,
+    MTEST_ASSERT_LE_SIZE(assertion_eval_a_size(SIZE_MAX),
+                         assertion_eval_b_size(SIZE_MAX));
+)
+
+ASSERTION_CASE(assertion_size_le_fail,
+    MTEST_ASSERT_LE_SIZE(assertion_eval_a_size(SIZE_MAX),
+                         assertion_eval_b_size((size_t)0));
+)
+
+static int run_typed_integer_case(const char *name,
+                                  assertion_probe_fn_t fn,
+                                  int expected_a,
+                                  int expected_b,
+                                  int expect_failed) {
+    int ok = 1;
+    mtest_state_t saved = mtest_g;
+
+    assertion_eval_reset();
+    memset(&mtest_g, 0, sizeof(mtest_g));
+    mtest_g.current_outcome = MTEST_OUTCOME_RUNNING;
+    mtest_g.current_phase = MTEST_PHASE_BODY;
+
+    fn();
+
+    if (!assertion_eval_counts_match(expected_a, expected_b, 0)) {
+        fprintf(stderr, "typed assertion counts mismatch for %s\n", name);
+        ok = 0;
+    }
+
+    if (mtest_g.tests_discovered != 0 ||
+        mtest_g.tests_selected != 0 ||
+        mtest_g.tests_run != 0 ||
+        mtest_g.tests_passed != 0 ||
+        mtest_g.tests_failed != expect_failed ||
+        mtest_g.tests_skipped != 0 ||
+        mtest_g.tests_filtered_out != 0 ||
+        mtest_g.suites_entered != 0 ||
+        mtest_g.asserts_total != 1 ||
+        mtest_g.asserts_failed != expect_failed ||
+        mtest_g.current_test != NULL ||
+        mtest_g.current_suite != NULL ||
+        mtest_g.current_skip_reason != NULL ||
+        mtest_g.current_outcome != (expect_failed ? MTEST_OUTCOME_FAILED
+                                                  : MTEST_OUTCOME_RUNNING) ||
+        mtest_g.current_phase != MTEST_PHASE_BODY ||
+        mtest_g.current_failed != expect_failed) {
+        fprintf(stderr, "typed assertion runner state mismatch for %s\n", name);
+        ok = 0;
+    }
+
+    mtest_g = saved;
+    return ok;
+}
+
+static int run_typed_integer_boundary_probe(void) {
+    int ok = 1;
+
+    if (!run_typed_integer_case("i32-eq-pass", assertion_i32_eq_pass, 1, 1, 0)) {
+        ok = 0;
+    }
+    if (!run_typed_integer_case("i32-eq-fail", assertion_i32_eq_fail, 1, 1, 1)) {
+        ok = 0;
+    }
+    if (!run_typed_integer_case("u32-ge-pass", assertion_u32_ge_pass, 1, 1, 0)) {
+        ok = 0;
+    }
+    if (!run_typed_integer_case("u32-ge-fail", assertion_u32_ge_fail, 1, 1, 1)) {
+        ok = 0;
+    }
+    if (!run_typed_integer_case("i64-lt-pass", assertion_i64_lt_pass, 1, 1, 0)) {
+        ok = 0;
+    }
+    if (!run_typed_integer_case("i64-lt-fail", assertion_i64_lt_fail, 1, 1, 1)) {
+        ok = 0;
+    }
+    if (!run_typed_integer_case("u64-eq-pass", assertion_u64_eq_pass, 1, 1, 0)) {
+        ok = 0;
+    }
+    if (!run_typed_integer_case("u64-eq-fail", assertion_u64_eq_fail, 1, 1, 1)) {
+        ok = 0;
+    }
+    if (!run_typed_integer_case("size-le-pass", assertion_size_le_pass, 1, 1, 0)) {
+        ok = 0;
+    }
+    if (!run_typed_integer_case("size-le-fail", assertion_size_le_fail, 1, 1, 1)) {
+        ok = 0;
+    }
+
+    return ok;
+}
+
 MTEST_SUITE(misc) {
     MTEST_RUN(test_skip_example);
     MTEST_RUN(test_large_values);
@@ -855,6 +1037,11 @@ int main(int argc, char **argv) {
     MTEST_SUITE_RUN(floats);
     MTEST_SUITE_RUN(fixtures);
     MTEST_SUITE_RUN(misc);
+    if (mtest_g.filter == NULL && !mtest_g.list_only && !mtest_g.stop_on_fail) {
+        if (!run_typed_integer_boundary_probe()) {
+            return 1;
+        }
+    }
     if (mtest_g.filter == NULL && !mtest_g.list_only && !mtest_g.stop_on_fail) {
         if (!run_assertion_single_eval_probe()) {
             return 1;
