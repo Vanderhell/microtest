@@ -7,7 +7,7 @@
 
 Single-header test framework for embedded C libraries.
 
-C99 | Header-only | Zero dependencies | Zero allocations | Color output | CLI filtering
+C99 | Header-only | Zero dependencies | Zero allocations | Color output | CLI filtering | Package export
 
 ## Why microtest?
 
@@ -15,13 +15,15 @@ Many small C libraries end up with copy-pasted ad-hoc test macros. `microtest` e
 
 ## Features
 
-- 16+ assertion macros for integers, strings, memory, floats, pointers, and booleans
-- Test suites for logical grouping
+- Type-correct assertions for signed and unsigned integers, strings, memory, floats, pointers, and booleans
+- Test suites for logical grouping, including multi-translation-unit suites
 - Setup/teardown fixtures via `MTEST_RUN_F`
 - Skip support with reason (`MTEST_SKIP`)
-- CLI options: `--filter`, `-v`, `-x`, `-l`, `-h`
-- Colorized output (configurable)
+- CLI options: `--filter`, `-v`, `-x`, `-l`, `-h`, `--no-color`
+- Output callbacks for custom reporting sinks
+- Colorized output with runtime control and `NO_COLOR` support
 - Per-run assertion counter in summary
+- CMake package export and install support
 
 ## Quick start
 
@@ -68,8 +70,10 @@ make
 | Macro | Default | Description |
 |-------|---------|-------------|
 | `MTEST_ENABLE_COLOR` | `1` | ANSI color output |
-| `MTEST_ENABLE_TIMING` | `1` | Reserved timing switch |
-| `MTEST_MAX_NAME` | `64` | Max test name length |
+| `MTEST_ENABLE_CLI` | `1` | Command-line parsing and help |
+| `MTEST_ENABLE_ENV` | `1` | `NO_COLOR` environment support |
+| `MTEST_ENABLE_EXIT` | `1` | `MTEST_END()` returns a process code |
+| `MTEST_ENABLE_FLOAT` | `1` | Floating-point assertions |
 
 ## Project structure
 
@@ -78,6 +82,7 @@ include/mtest.h      # framework header
 tests/test_all.c     # self-tests
 tests/Makefile       # local test build/run
 docs/DESIGN.md       # design rationale
+cmake/microtestConfig.cmake.in # package config template
 CONTRIBUTING.md      # contribution guide
 CHANGELOG.md         # release notes
 LICENSE              # MIT license (Vanderhell)
@@ -85,9 +90,8 @@ LICENSE              # MIT license (Vanderhell)
 
 ## Roadmap
 
-- JUnit/XML reporting mode
 - More assertion variants for custom diagnostics
-- Optional minimal benchmark helper for test runtime
+- Optional benchmark helper for test runtime
 
 ## Contributing
 
@@ -101,4 +105,3 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 MIT License, Copyright (c) 2026 Vanderhell.
 See [LICENSE](LICENSE).
-

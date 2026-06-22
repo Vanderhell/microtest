@@ -3,7 +3,7 @@
  *
  * Replaces the ad-hoc test macros scattered across the micro* ecosystem.
  * Provides: assertions, test registration, suites, setup/teardown, filtering,
- * color output, XML report, and summary stats.
+ * color output, output callbacks, and summary stats.
  *
  * C99 Â· Single header Â· Zero dependencies Â· Zero allocations Â· Portable
  *
@@ -34,6 +34,7 @@
 #define MTEST_H
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -55,6 +56,14 @@ typedef enum mtest_phase {
     MTEST_PHASE_TEARDOWN
 } mtest_phase_t;
 
+typedef enum mtest_begin_result {
+    MTEST_BEGIN_OK = 0,
+    MTEST_BEGIN_HELP_REQUESTED,
+    MTEST_BEGIN_INVALID_ARGUMENT
+} mtest_begin_result_t;
+
+typedef void (*mtest_write_fn)(void *user, const char *data, size_t length);
+
 /* â”€â”€ Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /** Enable ANSI color output. */
@@ -62,19 +71,24 @@ typedef enum mtest_phase {
 #define MTEST_ENABLE_COLOR 1
 #endif
 
-/** Enable timing (requires clock()). */
-#ifndef MTEST_ENABLE_TIMING
-#define MTEST_ENABLE_TIMING 1
+/** Enable command-line parsing. */
+#ifndef MTEST_ENABLE_CLI
+#define MTEST_ENABLE_CLI 1
+#endif
+
+/** Enable environment-variable integration. */
+#ifndef MTEST_ENABLE_ENV
+#define MTEST_ENABLE_ENV 1
+#endif
+
+/** Enable process exit helpers in hosted builds. */
+#ifndef MTEST_ENABLE_EXIT
+#define MTEST_ENABLE_EXIT 1
 #endif
 
 /** Enable floating-point assertions and math helpers. */
 #ifndef MTEST_ENABLE_FLOAT
 #define MTEST_ENABLE_FLOAT 1
-#endif
-
-/** Maximum test name length for filtering. */
-#ifndef MTEST_MAX_NAME
-#define MTEST_MAX_NAME 64
 #endif
 
 /* â”€â”€ Color codes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -125,17 +139,215 @@ typedef struct {
     int         verbose;            /* -v: show passing asserts          */
     int         stop_on_fail;       /* -x: stop after first failure      */
     int         list_only;          /* -l: list tests, don't run         */
-
-#if MTEST_ENABLE_TIMING
-    double      total_time_ms;
-    double      suite_time_ms;
-#endif
+    int         color_enabled;      /* runtime color toggle              */
+    mtest_write_fn write_fn;        /* output callback                   */
+    void       *write_user;         /* callback user data                */
+    mtest_begin_result_t begin_result;
 } mtest_state_t;
 
 /* Extern declaration â€” defined in MTEST_IMPLEMENTATION block */
-#ifndef MTEST_IMPLEMENTATION
 extern mtest_state_t mtest_g;
+
+static inline void mtest_default_write_(void *user, const char *data, size_t length) {
+    (void)user;
+    if (data != NULL && length > 0) {
+        fwrite(data, 1, length, stdout);
+    }
+}
+
+static inline void mtest_write_raw_(const char *data, size_t length) {
+    if (mtest_g.write_fn != NULL) {
+        mtest_g.write_fn(mtest_g.write_user, data, length);
+    } else {
+        mtest_default_write_(NULL, data, length);
+    }
+}
+
+static inline void mtest_write_cstr_(const char *text) {
+    if (text != NULL) {
+        mtest_write_raw_(text, strlen(text));
+    }
+}
+
+static inline void mtest_write_fmt_(const char *fmt, ...) {
+    char buffer[512];
+    va_list args;
+    int written;
+    va_start(args, fmt);
+    written = vsnprintf(buffer, sizeof(buffer), fmt, args);
+    va_end(args);
+    if (written < 0) {
+        return;
+    }
+    if ((size_t)written >= sizeof(buffer)) {
+        written = (int)(sizeof(buffer) - 1);
+    }
+    mtest_write_raw_(buffer, (size_t)written);
+}
+
+static inline const char *mtest_color_(const char *enabled, const char *disabled) {
+#if MTEST_ENABLE_COLOR
+    return mtest_g.color_enabled ? enabled : disabled;
+#else
+    (void)enabled;
+    return disabled;
 #endif
+}
+
+static inline void mtest_set_output(void *user, mtest_write_fn fn) {
+    mtest_g.write_user = user;
+    mtest_g.write_fn = fn;
+}
+
+static inline void mtest_set_color(int enabled) {
+#if MTEST_ENABLE_COLOR
+    mtest_g.color_enabled = enabled ? 1 : 0;
+#else
+    (void)enabled;
+    mtest_g.color_enabled = 0;
+#endif
+}
+
+static inline int mtest_env_present_(const char *name) {
+#if defined(_MSC_VER)
+    size_t required_size = 0;
+    if (getenv_s(&required_size, NULL, 0, name) != 0) {
+        return 0;
+    }
+    return required_size != 0;
+#else
+    return getenv(name) != NULL;
+#endif
+}
+
+static inline void mtest_print_usage_(const char *program) {
+    mtest_write_fmt_("Usage: %s [options]\n", program);
+    mtest_write_cstr_("  --filter=NAME  Run only tests matching NAME\n");
+    mtest_write_cstr_("  -v, --verbose  Verbose output\n");
+    mtest_write_cstr_("  -x, --stop-on-fail Stop on first failure\n");
+    mtest_write_cstr_("  -l, --list     List tests without running\n");
+    mtest_write_cstr_("  -h, --help     Show this help text\n");
+    mtest_write_cstr_("  --no-color     Disable ANSI color output\n");
+}
+
+static inline mtest_begin_result_t mtest_begin_(int argc, char **argv) {
+    mtest_write_fn previous_write_fn = mtest_g.write_fn;
+    void *previous_write_user = mtest_g.write_user;
+
+    memset(&mtest_g, 0, sizeof(mtest_g));
+    mtest_g.write_fn = previous_write_fn != NULL ? previous_write_fn
+                                                 : mtest_default_write_;
+    mtest_g.write_user = previous_write_user;
+    mtest_g.color_enabled = MTEST_ENABLE_COLOR ? 1 : 0;
+    mtest_g.begin_result = MTEST_BEGIN_OK;
+
+#if MTEST_ENABLE_ENV && MTEST_ENABLE_COLOR
+    if (mtest_env_present_("NO_COLOR")) {
+        mtest_g.color_enabled = 0;
+    }
+#endif
+
+#if MTEST_ENABLE_CLI
+    int i;
+    for (i = 1; i < argc; ++i) {
+        const char *arg = argv[i];
+        if (strncmp(arg, "--filter=", 9) == 0) {
+            const char *value = arg + 9;
+            if (*value == '\0') {
+                mtest_print_usage_(argv[0]);
+                mtest_g.begin_result = MTEST_BEGIN_INVALID_ARGUMENT;
+                return mtest_g.begin_result;
+            }
+            mtest_g.filter = value;
+        } else if (strcmp(arg, "-v") == 0 || strcmp(arg, "--verbose") == 0) {
+            mtest_g.verbose = 1;
+        } else if (strcmp(arg, "-x") == 0 || strcmp(arg, "--stop-on-fail") == 0) {
+            mtest_g.stop_on_fail = 1;
+        } else if (strcmp(arg, "-l") == 0 || strcmp(arg, "--list") == 0) {
+            mtest_g.list_only = 1;
+        } else if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
+            mtest_print_usage_(argv[0]);
+            mtest_g.begin_result = MTEST_BEGIN_HELP_REQUESTED;
+            return mtest_g.begin_result;
+        } else if (strcmp(arg, "--no-color") == 0) {
+            mtest_g.color_enabled = 0;
+        } else {
+            mtest_write_fmt_("Unknown option: %s\n", arg);
+            mtest_print_usage_(argv[0]);
+            mtest_g.begin_result = MTEST_BEGIN_INVALID_ARGUMENT;
+            return mtest_g.begin_result;
+        }
+    }
+#else
+    (void)argc;
+    (void)argv;
+#endif
+
+    mtest_write_fmt_("\n%s=== %s ===%s\n",
+                     mtest_color_(MTEST_CLR_BOLD, ""),
+                     argv[0],
+                     mtest_color_(MTEST_CLR_RESET, ""));
+    if (mtest_g.filter != NULL) {
+        mtest_write_fmt_("%s  filter: %s%s\n",
+                         mtest_color_(MTEST_CLR_DIM, ""),
+                         mtest_g.filter,
+                         mtest_color_(MTEST_CLR_RESET, ""));
+    }
+    return mtest_g.begin_result;
+}
+
+static inline int mtest_end_(void) {
+    int exit_code;
+
+    if (mtest_g.filter != NULL && mtest_g.tests_selected == 0) {
+        mtest_write_fmt_("No tests matched filter: %s\n", mtest_g.filter);
+        return 1;
+    }
+
+    mtest_write_fmt_("\n%s=== Results: ", mtest_color_(MTEST_CLR_BOLD, ""));
+    if (mtest_g.tests_failed == 0) {
+        mtest_write_fmt_("%s%d/%d passed",
+                         mtest_color_(MTEST_CLR_GREEN, ""),
+                         mtest_g.tests_passed,
+                         mtest_g.tests_run);
+    } else {
+        mtest_write_fmt_("%s%d/%d passed, %d FAILED",
+                         mtest_color_(MTEST_CLR_RED, ""),
+                         mtest_g.tests_passed,
+                         mtest_g.tests_run,
+                         mtest_g.tests_failed);
+    }
+    if (mtest_g.tests_skipped > 0) {
+        mtest_write_fmt_("%s, %d skipped",
+                         mtest_color_(MTEST_CLR_YELLOW, ""),
+                         mtest_g.tests_skipped);
+    }
+    if (mtest_g.tests_filtered_out > 0) {
+        mtest_write_fmt_("%s, %d filtered",
+                         mtest_color_(MTEST_CLR_CYAN, ""),
+                         mtest_g.tests_filtered_out);
+    }
+    mtest_write_fmt_("%s ===%s",
+                     mtest_color_(MTEST_CLR_RESET, ""),
+                     mtest_color_(MTEST_CLR_RESET, ""));
+    mtest_write_fmt_("%s (discovered=%d selected=%d run=%d suites=%d asserts=%d failed_asserts=%d)",
+                     mtest_color_(MTEST_CLR_DIM, ""),
+                     mtest_g.tests_discovered,
+                     mtest_g.tests_selected,
+                     mtest_g.tests_run,
+                     mtest_g.suites_entered,
+                     mtest_g.asserts_total,
+                     mtest_g.asserts_failed);
+    mtest_write_cstr_("\n\n");
+
+    exit_code = (mtest_g.tests_failed > 0) ? 1 : 0;
+    if (mtest_g.begin_result == MTEST_BEGIN_INVALID_ARGUMENT) {
+        exit_code = 1;
+    } else if (mtest_g.begin_result == MTEST_BEGIN_HELP_REQUESTED) {
+        exit_code = 0;
+    }
+    return exit_code;
+}
 
 /* â”€â”€ Test definition macros â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
@@ -145,12 +357,24 @@ extern mtest_state_t mtest_g;
 /** Define a suite function. */
 #define MTEST_SUITE(name)  static void mtest_suite_##name(void)
 
+/** Declare a suite defined in another translation unit. */
+#define MTEST_SUITE_DECLARE(name)  void mtest_suite_##name(void)
+
+/** Define a suite with external linkage for multi-TU use. */
+#define MTEST_SUITE_DEFINE(name)  void mtest_suite_##name(void)
+
 /** Run a suite. */
 #define MTEST_SUITE_RUN(name)  do {                                       \
+    if (mtest_g.stop_on_fail && mtest_g.tests_failed > 0) {                \
+        break;                                                             \
+    }                                                                      \
     mtest_g.current_suite = #name;                                         \
     mtest_g.suites_entered++;                                              \
     mtest_g.suites_run++;                                                  \
-    printf("\n" MTEST_CLR_BOLD "[%s]" MTEST_CLR_RESET "\n", #name);        \
+    mtest_write_fmt_("\n%s[%s]%s\n",                                       \
+                     mtest_color_(MTEST_CLR_BOLD, ""),                    \
+                     #name,                                                \
+                     mtest_color_(MTEST_CLR_RESET, ""));                  \
     mtest_suite_##name();                                                  \
     mtest_g.current_suite = NULL;                                          \
 } while (0)
@@ -159,7 +383,6 @@ extern mtest_state_t mtest_g;
 #define MTEST_RUN(name)  do {                                             \
     mtest_g.tests_discovered++;                                            \
     if (mtest_g.stop_on_fail && mtest_g.tests_failed > 0) {                \
-        mtest_g.tests_filtered_out++;                                      \
         break;                                                             \
     }                                                                      \
     if (mtest_g.filter != NULL &&                                          \
@@ -168,7 +391,7 @@ extern mtest_state_t mtest_g;
         break;                                                             \
     }                                                                      \
     if (mtest_g.list_only) {                                               \
-        printf("  %s\n", #name);                                           \
+        mtest_write_fmt_("  %s\n", #name);                                 \
         mtest_g.tests_filtered_out++;                                      \
         break;                                                             \
     }                                                                      \
@@ -179,15 +402,21 @@ extern mtest_state_t mtest_g;
     mtest_g.current_skip_reason = NULL;                                    \
     mtest_g.current_outcome = MTEST_OUTCOME_RUNNING;                       \
     mtest_g.current_phase = MTEST_PHASE_BODY;                              \
-    printf("  %-55s ", #name);                                             \
-    fflush(stdout);                                                        \
+    int mtest_asserts_before_ = mtest_g.asserts_total;                     \
+    mtest_write_fmt_("  %-55s ", #name);                                   \
     name();                                                                \
     if (mtest_g.current_outcome == MTEST_OUTCOME_RUNNING) {                \
         mtest_g.current_outcome = MTEST_OUTCOME_PASSED;                    \
     }                                                                      \
     if (mtest_g.current_outcome == MTEST_OUTCOME_PASSED) {                 \
         mtest_g.tests_passed++;                                            \
-        printf(MTEST_CLR_GREEN "PASS" MTEST_CLR_RESET "\n");              \
+        mtest_write_fmt_("%sPASS%s\n",                                     \
+                         mtest_color_(MTEST_CLR_GREEN, ""),              \
+                         mtest_color_(MTEST_CLR_RESET, ""));              \
+        if (mtest_g.verbose) {                                             \
+            mtest_write_fmt_("    asserts: %d\n",                          \
+                             mtest_g.asserts_total - mtest_asserts_before_);\
+        }                                                                  \
     }                                                                      \
     mtest_g.current_test = NULL;                                           \
     mtest_g.current_skip_reason = NULL;                                    \
@@ -205,7 +434,6 @@ extern mtest_state_t mtest_g;
 #define MTEST_RUN_F(name, setup_fn, teardown_fn)  do {                    \
     mtest_g.tests_discovered++;                                            \
     if (mtest_g.stop_on_fail && mtest_g.tests_failed > 0) {                \
-        mtest_g.tests_filtered_out++;                                      \
         break;                                                             \
     }                                                                      \
     if (mtest_g.filter != NULL &&                                          \
@@ -214,7 +442,7 @@ extern mtest_state_t mtest_g;
         break;                                                             \
     }                                                                      \
     if (mtest_g.list_only) {                                               \
-        printf("  %s\n", #name);                                           \
+        mtest_write_fmt_("  %s\n", #name);                                 \
         mtest_g.tests_filtered_out++;                                      \
         break;                                                             \
     }                                                                      \
@@ -227,8 +455,8 @@ extern mtest_state_t mtest_g;
     mtest_g.current_phase = MTEST_PHASE_SETUP;                             \
     mtest_outcome_t mtest_setup_outcome_ = MTEST_OUTCOME_RUNNING;          \
     int mtest_body_ran_ = 0;                                               \
-    printf("  %-55s ", #name);                                             \
-    fflush(stdout);                                                        \
+    int mtest_asserts_before_ = mtest_g.asserts_total;                     \
+    mtest_write_fmt_("  %-55s ", #name);                                   \
     setup_fn();                                                            \
     mtest_setup_outcome_ = mtest_g.current_outcome;                         \
     if (mtest_g.current_outcome == MTEST_OUTCOME_RUNNING) {                \
@@ -249,7 +477,13 @@ extern mtest_state_t mtest_g;
     }                                                                      \
     if (mtest_g.current_outcome == MTEST_OUTCOME_PASSED) {                 \
         mtest_g.tests_passed++;                                            \
-        printf(MTEST_CLR_GREEN "PASS" MTEST_CLR_RESET "\n");              \
+        mtest_write_fmt_("%sPASS%s\n",                                     \
+                         mtest_color_(MTEST_CLR_GREEN, ""),              \
+                         mtest_color_(MTEST_CLR_RESET, ""));              \
+        if (mtest_g.verbose) {                                             \
+            mtest_write_fmt_("    asserts: %d\n",                          \
+                             mtest_g.asserts_total - mtest_asserts_before_);\
+        }                                                                  \
     }                                                                      \
     mtest_g.current_test = NULL;                                           \
     mtest_g.current_skip_reason = NULL;                                    \
@@ -262,14 +496,18 @@ extern mtest_state_t mtest_g;
 
 #define MTEST_FAIL_(fmt, ...) do {                                        \
     if (mtest_g.current_failed == 0) {                                     \
-        printf(MTEST_CLR_RED "FAIL" MTEST_CLR_RESET "\n");                \
+        mtest_write_fmt_("%sFAIL%s\n",                                    \
+                         mtest_color_(MTEST_CLR_RED, ""),                \
+                         mtest_color_(MTEST_CLR_RESET, ""));              \
         mtest_g.tests_failed++;                                            \
     }                                                                      \
     mtest_g.current_outcome = MTEST_OUTCOME_FAILED;                        \
     mtest_g.current_failed++;                                              \
     mtest_g.asserts_failed++;                                              \
-    printf("    " MTEST_CLR_RED "%s:%d: " MTEST_CLR_RESET fmt "\n",       \
-           __FILE__, __LINE__, __VA_ARGS__);                               \
+    mtest_write_fmt_("    %s%s:%d: %s" fmt "\n",                           \
+                     mtest_color_(MTEST_CLR_RED, ""),                    \
+                     __FILE__, __LINE__,                                   \
+                     mtest_color_(MTEST_CLR_RESET, ""), __VA_ARGS__);     \
     return;                                                                \
 } while (0)
 
@@ -829,14 +1067,21 @@ extern mtest_state_t mtest_g;
             mtest_g.tests_failed++;                                        \
         }                                                                  \
         mtest_g.current_failed++;                                          \
-        printf(MTEST_CLR_RED "FAIL" MTEST_CLR_RESET "\n");                \
-        printf("    " MTEST_CLR_RED "%s:%d: teardown cannot skip: %s"     \
-               MTEST_CLR_RESET "\n", __FILE__, __LINE__, (reason));       \
+        mtest_write_fmt_("%sFAIL%s\n",                                    \
+                         mtest_color_(MTEST_CLR_RED, ""),                \
+                         mtest_color_(MTEST_CLR_RESET, ""));              \
+        mtest_write_fmt_("    %s%s:%d: teardown cannot skip: %s%s\n",      \
+                         mtest_color_(MTEST_CLR_RED, ""),                \
+                         __FILE__, __LINE__, (reason),                     \
+                         mtest_color_(MTEST_CLR_RESET, ""));              \
         return;                                                            \
     }                                                                      \
     mtest_g.current_outcome = MTEST_OUTCOME_SKIPPED;                       \
     mtest_g.current_skip_reason = (reason);                                \
-    printf(MTEST_CLR_YELLOW "SKIP" MTEST_CLR_RESET " (%s)\n", (reason)); \
+    mtest_write_fmt_("%sSKIP%s (%s)\n",                                   \
+                     mtest_color_(MTEST_CLR_YELLOW, ""),                 \
+                     mtest_color_(MTEST_CLR_RESET, ""),                   \
+                     (reason));                                            \
     mtest_g.tests_skipped++;                                               \
     return;                                                                \
 } while (0)
@@ -845,37 +1090,10 @@ extern mtest_state_t mtest_g;
 
 /**
  * Parse CLI args and print header.
- * Supports: --filter=NAME, -v (verbose), -x (stop on fail), -l (list).
+ * Supports: --filter=NAME, -v/--verbose, -x/--stop-on-fail, -l/--list,
+ * -h/--help, and --no-color.
  */
-#define MTEST_BEGIN(argc, argv) do {                                      \
-    memset(&mtest_g, 0, sizeof(mtest_g));                                  \
-    for (int i_ = 1; i_ < (argc); i_++) {                                 \
-        if (strncmp((argv)[i_], "--filter=", 9) == 0) {                    \
-            mtest_g.filter = (argv)[i_] + 9;                               \
-        } else if (strcmp((argv)[i_], "-v") == 0) {                        \
-            mtest_g.verbose = 1;                                           \
-        } else if (strcmp((argv)[i_], "-x") == 0) {                        \
-            mtest_g.stop_on_fail = 1;                                      \
-        } else if (strcmp((argv)[i_], "-l") == 0) {                        \
-            mtest_g.list_only = 1;                                         \
-        } else if (strcmp((argv)[i_], "-h") == 0 ||                        \
-                   strcmp((argv)[i_], "--help") == 0) {                     \
-            printf("Usage: %s [options]\n"                                 \
-                   "  --filter=NAME  Run only tests matching NAME\n"       \
-                   "  -v             Verbose output\n"                      \
-                   "  -x             Stop on first failure\n"              \
-                   "  -l             List tests without running\n",        \
-                   (argv)[0]);                                              \
-            exit(0);                                                        \
-        }                                                                  \
-    }                                                                      \
-    printf("\n" MTEST_CLR_BOLD "=== %s ===" MTEST_CLR_RESET "\n",          \
-           (argv)[0]);                                                     \
-    if (mtest_g.filter) {                                                  \
-        printf(MTEST_CLR_DIM "  filter: %s" MTEST_CLR_RESET "\n",         \
-               mtest_g.filter);                                            \
-    }                                                                      \
-} while (0)
+#define MTEST_BEGIN(argc, argv) mtest_begin_((argc), (argv))
 
 /** Print summary and return exit code. */
 #define MTEST_END()  mtest_end_()
@@ -885,40 +1103,6 @@ extern mtest_state_t mtest_g;
 #ifdef MTEST_IMPLEMENTATION
 
 mtest_state_t mtest_g;
-
-static int mtest_end_(void) {
-    printf("\n" MTEST_CLR_BOLD "=== Results: ");
-
-    if (mtest_g.tests_failed == 0) {
-        printf(MTEST_CLR_GREEN "%d/%d passed",
-               mtest_g.tests_passed, mtest_g.tests_run);
-    } else {
-        printf(MTEST_CLR_RED "%d/%d passed, %d FAILED",
-               mtest_g.tests_passed, mtest_g.tests_run,
-               mtest_g.tests_failed);
-    }
-
-    if (mtest_g.tests_skipped > 0) {
-        printf(MTEST_CLR_YELLOW ", %d skipped", mtest_g.tests_skipped);
-    }
-
-    if (mtest_g.tests_filtered_out > 0) {
-        printf(MTEST_CLR_CYAN ", %d filtered", mtest_g.tests_filtered_out);
-    }
-
-    printf(MTEST_CLR_RESET MTEST_CLR_BOLD " ===" MTEST_CLR_RESET);
-    printf(MTEST_CLR_DIM " (discovered=%d selected=%d run=%d suites=%d asserts=%d failed_asserts=%d)"
-           MTEST_CLR_RESET,
-           mtest_g.tests_discovered,
-           mtest_g.tests_selected,
-           mtest_g.tests_run,
-           mtest_g.suites_entered,
-           mtest_g.asserts_total,
-           mtest_g.asserts_failed);
-    printf("\n\n");
-
-    return mtest_g.tests_failed > 0 ? 1 : 0;
-}
 
 #endif /* MTEST_IMPLEMENTATION */
 

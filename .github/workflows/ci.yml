@@ -9,16 +9,31 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        compiler: [gcc, clang]
+        include:
+          - os: ubuntu-latest
+            compiler: gcc
+            build: make
+          - os: ubuntu-latest
+            compiler: clang
+            build: make
+          - os: windows-latest
+            compiler: clangcl
+            build: cmake
+    runs-on: ${{ matrix.os }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install Ninja
+        if: matrix.build == 'cmake'
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
       - name: Build and test
+        if: matrix.build == 'make'
         working-directory: tests
         env:
           CC: ${{ matrix.compiler }}
@@ -26,3 +41,14 @@ jobs:
           make clean
           make
 
+      - name: Configure CMake
+        if: matrix.build == 'cmake'
+        run: cmake -S . -B build -T ClangCL
+
+      - name: Build CMake
+        if: matrix.build == 'cmake'
+        run: cmake --build build --config Debug --parallel 1
+
+      - name: Test CMake
+        if: matrix.build == 'cmake'
+        run: ctest --test-dir build -C Debug --output-on-failure
