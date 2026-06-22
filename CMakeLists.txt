@@ -115,18 +115,7 @@ if(MICROTEST_BUILD_TESTS)
     add_test(NAME microtest_selftest COMMAND test_microtest)
     add_test(NAME microtest_selftest_float_off COMMAND test_microtest_float_off)
     add_test(NAME microtest_embedded_profile COMMAND test_microtest_embedded)
-    add_test(NAME output_callback COMMAND test_output_callback)
-    add_test(NAME output_callback_nocolor COMMAND test_output_callback_nocolor)
-    add_test(NAME stop_on_fail COMMAND test_stop_on_fail)
     add_test(NAME multi_tu COMMAND test_multi_tu)
-
-    add_test(
-        NAME cli_behavior
-        COMMAND "${CMAKE_COMMAND}"
-            -DTEST_EXE=$<TARGET_FILE:test_microtest>
-            -DTEST_DIR=${CMAKE_CURRENT_SOURCE_DIR}
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/verify_cli.cmake"
-    )
     add_test(
         NAME install_consumer
         COMMAND "${CMAKE_COMMAND}"
@@ -134,6 +123,19 @@ if(MICROTEST_BUILD_TESTS)
             -DPROJECT_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/verify_install.cmake"
     )
+
+    if(MICROTEST_ENABLE_CLI)
+        add_test(NAME output_callback COMMAND test_output_callback)
+        add_test(NAME output_callback_nocolor COMMAND test_output_callback_nocolor)
+        add_test(NAME stop_on_fail COMMAND test_stop_on_fail)
+        add_test(
+            NAME cli_behavior
+            COMMAND "${CMAKE_COMMAND}"
+                -DTEST_EXE=$<TARGET_FILE:test_microtest>
+                -DTEST_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/verify_cli.cmake"
+        )
+    endif()
 endif()
 
 if(MICROTEST_BUILD_EXAMPLES)
