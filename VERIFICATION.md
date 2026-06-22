@@ -5,7 +5,7 @@ Executed on Windows PowerShell in `C:\Users\vande\Desktop\github\microtest\micro
 ## Results
 
 - `git status --short` -> only the unrelated `.gitignore` modification remained uncommitted.
-- `git log --oneline --decorate -10` -> latest commit `a457ac9 build: add package export and CLI controls`.
+- `git log --oneline --decorate -10` -> latest commit `a700a19 docs: add verification log and gate cli-off tests`.
 - `git tag --list` -> no tags present.
 - `git diff --check` -> no patch errors; warning only for existing `.gitignore` line endings.
 - GCC single-file build:
@@ -15,6 +15,15 @@ Executed on Windows PowerShell in `C:\Users\vande\Desktop\github\microtest\micro
 - GCC sanitizer attempt:
   - `gcc.exe -std=c99 -Wall -Wextra -Wpedantic -Werror "-fsanitize=address,undefined" -Iinclude tests\test_all.c -o C:\tmp\microtest_san.exe -lm`
   - Result: failed to link `-lasan` and `-lubsan`; executable was not produced.
+- Clang sanitizer attempt:
+  - `clang.exe -std=c99 -Wall -Wextra -Wpedantic -Werror "-fsanitize=address,undefined" -Iinclude tests\test_all.c -o C:\tmp\microtest_clang_san.exe -lm`
+  - Result: failed with `fatal error: 'stdio.h' file not found`.
+- ClangCL sanitizer attempt:
+  - `clang-cl.exe /nologo /std:c11 /W4 /WX "-fsanitize=address,undefined" /Iinclude tests\test_all.c /Fe:C:\tmp\microtest_clangcl_san.exe`
+  - Result: failed with `unable to find a Visual Studio installation`.
+- CMake sanitizer attempt:
+  - `cmake -S . -B C:\tmp\microtest-asan -T ClangCL -DCMAKE_C_FLAGS_DEBUG=/fsanitize=address`
+  - Result: failed in compiler detection with `invalid argument '/MDd' not allowed with '-fsanitize=address'`.
 - ClangCL CMake/CTest default build:
   - `cmake -S . -B C:\tmp\microtest-clangcl-final -T ClangCL`
   - `cmake --build C:\tmp\microtest-clangcl-final --config Debug --parallel 1`
@@ -46,4 +55,4 @@ Executed on Windows PowerShell in `C:\Users\vande\Desktop\github\microtest\micro
 ## Notes
 
 - The unrelated `.gitignore` change remained uncommitted throughout.
-- No annotated tag was created.
+- The local release tag `v1.1.0` was created and then deleted because the release gate was still incomplete.
