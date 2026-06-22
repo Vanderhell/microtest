@@ -4,8 +4,8 @@ Executed on Windows PowerShell in `C:\Users\vande\Desktop\github\microtest\micro
 
 ## Results
 
-- `git status --short` -> `M tests/test_all.c` and `?? build-reduce/` before commit.
-- `git log --oneline --decorate -10` -> latest commit `d94ae39 docs: update verification evidence`.
+- `git status --short` -> clean after removing the temporary reduction artifact.
+- `git log --oneline --decorate -10` -> latest commit `aa096c8 test: fix msvc build and update verification`.
 - `git tag --list` -> no tags present.
 - `git diff --check` -> no patch errors.
 - MSVC clean build retry:
@@ -37,8 +37,9 @@ Executed on Windows PowerShell in `C:\Users\vande\Desktop\github\microtest\micro
   - Included in the ClangCL and MSVC `ctest` runs via `install_consumer`.
   - Result: passed.
 - GCC single-file build:
-  - `gcc -std=c99 -Wall -Wextra -Werror -I tests tests/test_all.c -o C:\tmp\microtest-gcc.exe`
-  - Result: failed because `gcc` is not on `PATH` on this host.
+  - `C:\Users\vande\AppData\Local\Microsoft\WinGet\Packages\BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\mingw64\bin\gcc.exe -std=c99 -Wall -Wextra -Werror -I include tests/test_all.c -o C:\tmp\microtest-gcc.exe`
+  - `C:\tmp\microtest-gcc.exe`
+  - Result: passed.
 - LLVM sanitizer attempt:
   - `cmake -S . -B C:\tmp\microtest-sanitize -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_C_FLAGS="-fsanitize=address,undefined" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" -DCMAKE_BUILD_TYPE=Debug`
   - Result: failed at link time with missing `oldnames.lib` and `msvcrtd.lib`.
