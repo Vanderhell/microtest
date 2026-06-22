@@ -1,9 +1,25 @@
 # Contributing
 
-In scope: new assertions, bug fixes, docs, build integration, and verification coverage.
+Contributions are welcome for:
 
-Out of scope: dynamic allocation, hidden dependencies, or weakening the existing tests.
+- Bug fixes.
+- New assertions that preserve the current API style.
+- Docs, packaging, and verification coverage.
+- Build-system and portability improvements.
 
-Before opening a change, run the available project tests and keep the single-header integration model intact.
+Do not contribute changes that introduce:
 
-By contributing, you agree to the MIT License.
+- Dynamic allocation.
+- Hidden dependencies.
+- Global warning suppression.
+- Weaker tests.
+- New behavior that is not documented and verified.
+
+Requirements:
+
+- Keep the project C99.
+- Preserve single-header integration.
+- Keep examples conceptually compilable.
+- Update verification evidence when behavior changes.
+
+Before opening a change, run the available project tests and the applicable build path for the area you touched.

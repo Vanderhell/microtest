@@ -1,31 +1,25 @@
 # microtest
 
-[![CI](https://github.com/Vanderhell/microtest/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Vanderhell/microtest/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![C99](https://img.shields.io/badge/C-C99-blue.svg)](https://en.wikipedia.org/wiki/C99)
-[![Header-only](https://img.shields.io/badge/style-header--only-success.svg)](include/mtest.h)
+Single-header C99 test framework for hosted and embedded-oriented C projects.
 
-Single-header test framework for embedded C libraries.
+What it does:
 
-C99 | Header-only | Zero dependencies | Zero allocations | Color output | CLI filtering | Package export
+- Assertions for integers, pointers, strings, memory, and optional floats.
+- Suites for grouping tests, including multi-translation-unit suites.
+- Fixtures with explicit setup and teardown.
+- Runtime CLI filtering, list mode, verbose mode, stop-on-fail, and no-color.
+- Output callbacks for custom sinks.
+- CMake package export, install, and consumer verification.
 
-## Why microtest?
+What it does not do:
 
-Many small C libraries end up with copy-pasted ad-hoc test macros. `microtest` extracts that pattern into a single reusable header with a consistent API.
+- No dynamic allocation.
+- No third-party dependencies.
+- No claim of thread safety.
+- No ASan/UBSan verification on this host.
+- No claim of freestanding, ISR, RTOS, or production readiness.
 
-## Features
-
-- Type-correct assertions for signed and unsigned integers, strings, memory, floats, pointers, and booleans
-- Test suites for logical grouping, including multi-translation-unit suites
-- Setup/teardown fixtures via `MTEST_RUN_F`
-- Skip support with reason (`MTEST_SKIP`)
-- CLI options: `--filter`, `-v`, `-x`, `-l`, `-h`, `--no-color`
-- Output callbacks for custom reporting sinks
-- Colorized output with runtime control and `NO_COLOR` support
-- Per-run assertion counter in summary
-- CMake package export and install support
-
-## Quick start
+## Quick Start
 
 ```c
 #define MTEST_IMPLEMENTATION
@@ -46,62 +40,96 @@ int main(int argc, char **argv) {
 }
 ```
 
-## Build and run self-tests
+## Basic Examples
 
-```bash
-cd tests
-make clean
-make
+Assertions:
+
+```c
+MTEST(test_strings) {
+    MTEST_ASSERT_STR_EQ("alpha", "alpha");
+    MTEST_ASSERT_MEM_EQ("abc", "abc", 3);
+}
 ```
 
-## CLI examples
+Skip:
+
+```c
+MTEST(test_skip_example) {
+    MTEST_SKIP("not supported here");
+}
+```
+
+Fixture:
+
+```c
+static void setup(void) { }
+static void teardown(void) { }
+
+MTEST(test_with_fixture) {
+    MTEST_ASSERT_TRUE(1);
+}
+
+MTEST_SUITE(example) {
+    MTEST_RUN_F(test_with_fixture, setup, teardown);
+}
+```
+
+Multi-TU:
+
+```c
+/* in one file */
+MTEST_SUITE_DEFINE(shared) { MTEST_RUN(test_one); }
+
+/* in another file */
+MTEST_SUITE_DECLARE(shared);
+```
+
+## CLI
+
+Supported options:
+
+- `--filter=NAME`
+- `-v`, `--verbose`
+- `-x`, `--stop-on-fail`
+- `-l`, `--list`
+- `-h`, `--help`
+- `--no-color`
+
+Examples:
 
 ```bash
-./test_all
 ./test_all --filter=ring
 ./test_all -l
 ./test_all -x
-./test_all -v
-./test_all -h
+./test_all --no-color
 ```
+
+`--help` prints usage and returns success without running suites.
+An empty `--filter=` is invalid.
+An unknown option fails with a nonzero exit code.
 
 ## Configuration
 
-| Macro | Default | Description |
-|-------|---------|-------------|
-| `MTEST_ENABLE_COLOR` | `1` | ANSI color output |
-| `MTEST_ENABLE_CLI` | `1` | Command-line parsing and help |
-| `MTEST_ENABLE_ENV` | `1` | `NO_COLOR` environment support |
-| `MTEST_ENABLE_EXIT` | `1` | `MTEST_END()` returns a process code |
-| `MTEST_ENABLE_FLOAT` | `1` | Floating-point assertions |
+| Macro | Default | Meaning |
+|---|---:|---|
+| `MTEST_ENABLE_COLOR` | `1` | ANSI colors at runtime |
+| `MTEST_ENABLE_CLI` | `1` | CLI parsing and help |
+| `MTEST_ENABLE_ENV` | `1` | `NO_COLOR` support |
+| `MTEST_ENABLE_EXIT` | `1` | Hosted exit codes from `MTEST_END()` |
+| `MTEST_ENABLE_FLOAT` | `1` | Float assertions and math helpers |
 
-## Project structure
+## Layout
 
-```text
-include/mtest.h      # framework header
-tests/test_all.c     # self-tests
-tests/Makefile       # local test build/run
-docs/DESIGN.md       # design rationale
-cmake/microtestConfig.cmake.in # package config template
-CONTRIBUTING.md      # contribution guide
-CHANGELOG.md         # release notes
-LICENSE              # MIT license (Vanderhell)
-```
+- `include/mtest.h` - single public header
+- `tests/` - self-tests, CLI checks, install consumer, and multi-TU checks
+- `cmake/` - package config template
+- `docs/` - reference notes for API and usage
 
-## Roadmap
+## More
 
-- More assertion variants for custom diagnostics
-- Optional benchmark helper for test runtime
-
-## Contributing
-
-Please read [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md).
-
-## License
-
-MIT License, Copyright (c) 2026 Vanderhell.
-See [LICENSE](LICENSE).
+- [API](docs/API.md)
+- [Assertions](docs/ASSERTIONS.md)
+- [CLI](docs/CLI.md)
+- [Fixtures](docs/FIXTURES.md)
+- [Testing](docs/TESTING.md)
+- [Release](docs/RELEASE.md)
