@@ -38,7 +38,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <inttypes.h>
-#include <math.h>
 
 typedef enum mtest_outcome {
     MTEST_OUTCOME_NOT_RUN = 0,
@@ -66,6 +65,11 @@ typedef enum mtest_phase {
 /** Enable timing (requires clock()). */
 #ifndef MTEST_ENABLE_TIMING
 #define MTEST_ENABLE_TIMING 1
+#endif
+
+/** Enable floating-point assertions and math helpers. */
+#ifndef MTEST_ENABLE_FLOAT
+#define MTEST_ENABLE_FLOAT 1
 #endif
 
 /** Maximum test name length for filtering. */
@@ -737,28 +741,82 @@ extern mtest_state_t mtest_g;
     }                                                                      \
 } while (0)
 
-/** Assert two floats are approximately equal. */
+#if MTEST_ENABLE_FLOAT
+
+#include <math.h>
+
+/** Assert two floats are exactly equal. NaN never passes. */
 #define MTEST_ASSERT_FLOAT_EQ(expected, actual) do {                      \
     mtest_g.asserts_total++;                                               \
     float mtest_e_ = (float)(expected);                                    \
     float mtest_a_ = (float)(actual);                                      \
-    if (fabsf(mtest_e_ - mtest_a_) > 0.001f) {                            \
-        MTEST_FAIL_("expected %f, got %f", (double)mtest_e_,              \
-                     (double)mtest_a_);                                    \
+    if (mtest_e_ != mtest_a_) {                                            \
+        MTEST_FAIL_("expected %g, got %g", (double)mtest_e_,             \
+                    (double)mtest_a_);                                     \
     }                                                                      \
 } while (0)
 
-/** Assert two doubles are approximately equal with custom epsilon. */
+/** Assert two floats are approximately equal using absolute epsilon only. */
 #define MTEST_ASSERT_NEAR(expected, actual, epsilon) do {                  \
     mtest_g.asserts_total++;                                               \
     double mtest_e_ = (double)(expected);                                  \
     double mtest_a_ = (double)(actual);                                    \
     double mtest_eps_ = (double)(epsilon);                                 \
-    if (fabs(mtest_e_ - mtest_a_) > mtest_eps_) {                         \
-        MTEST_FAIL_("expected %f Â± %f, got %f",                           \
-                     mtest_e_, mtest_eps_, mtest_a_);                      \
+    if (mtest_eps_ < 0.0) {                                                \
+        MTEST_FAIL_("epsilon must be non-negative: %s", #epsilon);       \
+    } else if (isnan(mtest_e_) || isnan(mtest_a_)) {                       \
+        MTEST_FAIL_("%s", "expected finite values, got NaN");            \
+    } else if (isinf(mtest_e_) || isinf(mtest_a_)) {                       \
+        if (mtest_e_ != mtest_a_) {                                        \
+            MTEST_FAIL_("expected %g, got %g", mtest_e_, mtest_a_);     \
+        }                                                                  \
+    } else if (fabs(mtest_e_ - mtest_a_) > mtest_eps_) {                   \
+        MTEST_FAIL_("expected %g +/- %g, got %g",                         \
+                    mtest_e_, mtest_eps_, mtest_a_);                       \
     }                                                                      \
 } while (0)
+
+/** Assert value is NaN. */
+#define MTEST_ASSERT_IS_NAN(value) do {                                    \
+    mtest_g.asserts_total++;                                               \
+    double mtest_v_ = (double)(value);                                     \
+    if (!isnan(mtest_v_)) {                                                \
+        MTEST_FAIL_("expected NaN, got %g", mtest_v_);                   \
+    }                                                                      \
+} while (0)
+
+/** Assert value is finite. */
+#define MTEST_ASSERT_IS_FINITE(value) do {                                 \
+    mtest_g.asserts_total++;                                               \
+    double mtest_v_ = (double)(value);                                     \
+    if (!isfinite(mtest_v_)) {                                             \
+        MTEST_FAIL_("expected finite value, got %g", mtest_v_);          \
+    }                                                                      \
+} while (0)
+
+/** Assert value is infinite. */
+#define MTEST_ASSERT_IS_INF(value) do {                                   \
+    mtest_g.asserts_total++;                                               \
+    double mtest_v_ = (double)(value);                                     \
+    if (!isinf(mtest_v_)) {                                                \
+        MTEST_FAIL_("expected infinity, got %g", mtest_v_);              \
+    }                                                                      \
+} while (0)
+
+#else
+
+#define MTEST_ASSERT_FLOAT_EQ(...)                                         \
+    MTEST_FLOAT_ASSERTIONS_DISABLED_USE_MTEST_ENABLE_FLOAT_1
+#define MTEST_ASSERT_NEAR(...)                                             \
+    MTEST_FLOAT_ASSERTIONS_DISABLED_USE_MTEST_ENABLE_FLOAT_2
+#define MTEST_ASSERT_IS_NAN(...)                                           \
+    MTEST_FLOAT_ASSERTIONS_DISABLED_USE_MTEST_ENABLE_FLOAT_3
+#define MTEST_ASSERT_IS_FINITE(...)                                        \
+    MTEST_FLOAT_ASSERTIONS_DISABLED_USE_MTEST_ENABLE_FLOAT_4
+#define MTEST_ASSERT_IS_INF(...)                                           \
+    MTEST_FLOAT_ASSERTIONS_DISABLED_USE_MTEST_ENABLE_FLOAT_5
+
+#endif
 
 /** Unconditional fail. */
 #define MTEST_FAIL(msg) MTEST_FAIL_("%s", (msg))
