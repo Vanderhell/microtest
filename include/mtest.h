@@ -652,10 +652,14 @@ extern mtest_state_t mtest_g;
     }                                                                      \
 } while (0)
 
+/* Pointer assertions are defined for object pointers. Function pointers are
+ * not portably printable through %p, so they are outside this API contract.
+ */
+
 /** Assert pointer is NULL. */
 #define MTEST_ASSERT_NULL(ptr) do {                                       \
     mtest_g.asserts_total++;                                               \
-    void *mtest_ptr_ = (void *)(ptr);                                      \
+    const void *mtest_ptr_ = (const void *)(ptr);                         \
     if (mtest_ptr_ != NULL) {                                              \
         MTEST_FAIL_("expected NULL, got %p", mtest_ptr_);                 \
     }                                                                      \
@@ -664,7 +668,7 @@ extern mtest_state_t mtest_g;
 /** Assert pointer is not NULL. */
 #define MTEST_ASSERT_NOT_NULL(ptr) do {                                   \
     mtest_g.asserts_total++;                                               \
-    void *mtest_ptr_ = (void *)(ptr);                                      \
+    const void *mtest_ptr_ = (const void *)(ptr);                         \
     if (mtest_ptr_ == NULL) {                                              \
         MTEST_FAIL_("expected non-NULL: %s", #ptr);                       \
     }                                                                      \
@@ -686,32 +690,50 @@ extern mtest_state_t mtest_g;
     }                                                                      \
 } while (0)
 
-/** Assert string contains substring. */
+/** Assert string contains substring.
+ * Null haystack or needle fails safely. Empty needle follows strstr semantics.
+ */
 #define MTEST_ASSERT_STR_CONTAINS(haystack, needle) do {                  \
     mtest_g.asserts_total++;                                               \
     const char *mtest_h_ = (haystack);                                     \
     const char *mtest_n_ = (needle);                                       \
-    if (mtest_h_ == NULL || mtest_n_ == NULL ||                            \
-        strstr(mtest_h_, mtest_n_) == NULL) {                              \
-        MTEST_FAIL_("\"%s\" not found in \"%s\"",                    \
-                    mtest_n_ ? mtest_n_ : "(null)",                      \
-                    mtest_h_ ? mtest_h_ : "(null)");                      \
+    if (mtest_h_ == NULL || mtest_n_ == NULL) {                            \
+        MTEST_FAIL_("expected \"%s\" to contain \"%s\"",            \
+                    mtest_h_ ? mtest_h_ : "(null)",                      \
+                    mtest_n_ ? mtest_n_ : "(null)");                      \
+    } else if (strstr(mtest_h_, mtest_n_) == NULL) {                       \
+        MTEST_FAIL_("expected \"%s\" to contain \"%s\"",            \
+                    mtest_h_, mtest_n_);                                  \
     }                                                                      \
 } while (0)
 
-/** Assert two memory regions are equal. */
+/** Assert two memory regions are equal.
+ * Zero length passes even when pointers are NULL. Negative lengths fail.
+ */
 #define MTEST_ASSERT_MEM_EQ(expected, actual, len) do {                   \
     mtest_g.asserts_total++;                                               \
-    const void *mtest_e_ = (expected);                                     \
-    const void *mtest_a_ = (actual);                                       \
-    size_t mtest_len_ = (size_t)(len);                                     \
-    if (mtest_e_ == NULL || mtest_a_ == NULL) {                            \
-        if (mtest_e_ != mtest_a_) {                                        \
-            MTEST_FAIL_("memory mismatch (%zu bytes): expected %p, got %p",\
-                        mtest_len_, mtest_e_, mtest_a_);                  \
+    const unsigned char *mtest_e_ = (const unsigned char *)(expected);     \
+    const unsigned char *mtest_a_ = (const unsigned char *)(actual);       \
+    long long mtest_len_check_ = (long long)(len);                         \
+    size_t mtest_len_ = (size_t)mtest_len_check_;                          \
+    if (mtest_len_check_ < 0) {                                            \
+        MTEST_FAIL_("memory length must be non-negative: %s", #len);     \
+    } else if (mtest_len_ == 0) {                                          \
+    } else if (mtest_e_ == NULL || mtest_a_ == NULL) {                     \
+        MTEST_FAIL_("memory mismatch (%zu bytes): expected %p, got %p",  \
+                    mtest_len_, (const void *)mtest_e_,                   \
+                    (const void *)mtest_a_);                              \
+    } else {                                                               \
+        size_t mtest_i_;                                                   \
+        for (mtest_i_ = 0; mtest_i_ < mtest_len_; ++mtest_i_) {            \
+            if (mtest_e_[mtest_i_] != mtest_a_[mtest_i_]) {                \
+                MTEST_FAIL_("memory mismatch (%zu bytes) at offset %zu: " \
+                            "%02x != %02x",                               \
+                            mtest_len_, mtest_i_,                          \
+                            (unsigned)mtest_e_[mtest_i_],                  \
+                            (unsigned)mtest_a_[mtest_i_]);                 \
+            }                                                              \
         }                                                                  \
-    } else if (memcmp(mtest_e_, mtest_a_, mtest_len_) != 0) {              \
-        MTEST_FAIL_("memory mismatch (%zu bytes)", mtest_len_);           \
     }                                                                      \
 } while (0)
 

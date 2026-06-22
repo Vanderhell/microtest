@@ -749,6 +749,172 @@ static int run_assertion_single_eval_probe(void) {
     return ok;
 }
 
+ASSERTION_CASE(safety_str_eq_null_pass,
+    MTEST_ASSERT_STR_EQ(assertion_eval_a_str(NULL),
+                        assertion_eval_b_str(NULL));
+)
+
+ASSERTION_CASE(safety_str_eq_null_fail,
+    MTEST_ASSERT_STR_EQ(assertion_eval_a_str(NULL),
+                        assertion_eval_b_str("alpha"));
+)
+
+ASSERTION_CASE(safety_str_contains_null_haystack_fail,
+    MTEST_ASSERT_STR_CONTAINS(assertion_eval_a_str(NULL),
+                              assertion_eval_b_str("alpha"));
+)
+
+ASSERTION_CASE(safety_str_contains_null_needle_fail,
+    MTEST_ASSERT_STR_CONTAINS(assertion_eval_a_str("alpha"),
+                              assertion_eval_b_str(NULL));
+)
+
+ASSERTION_CASE(safety_str_contains_empty_needle_pass,
+    MTEST_ASSERT_STR_CONTAINS(assertion_eval_a_str("alpha"),
+                              assertion_eval_b_str(""));
+)
+
+static const unsigned char safety_mem_a[] = {0x10, 0x20, 0x30, 0x40};
+static const unsigned char safety_mem_b[] = {0x10, 0x20, 0x30, 0x40};
+
+ASSERTION_CASE(safety_mem_eq_zero_len_null_pass,
+    MTEST_ASSERT_MEM_EQ(assertion_eval_a_mem(NULL),
+                        assertion_eval_b_mem(NULL),
+                        assertion_eval_c_size(0));
+)
+
+ASSERTION_CASE(safety_mem_eq_pass_once,
+    MTEST_ASSERT_MEM_EQ(assertion_eval_a_mem(safety_mem_a),
+                        assertion_eval_b_mem(safety_mem_b),
+                        assertion_eval_c_size(sizeof(safety_mem_a)));
+)
+
+ASSERTION_CASE(safety_mem_eq_nonzero_null_fail,
+    MTEST_ASSERT_MEM_EQ(assertion_eval_a_mem(NULL),
+                        assertion_eval_b_mem(safety_mem_b),
+                        assertion_eval_c_size(sizeof(safety_mem_b)));
+)
+
+ASSERTION_CASE(safety_mem_eq_negative_len_fail,
+    MTEST_ASSERT_MEM_EQ(assertion_eval_a_mem(safety_mem_a),
+                        assertion_eval_b_mem(safety_mem_b),
+                        assertion_eval_c_int(-1));
+)
+
+ASSERTION_CASE(safety_ptr_null_pass,
+    MTEST_ASSERT_NULL(assertion_eval_a_ptr(NULL));
+)
+
+ASSERTION_CASE(safety_ptr_null_fail,
+    MTEST_ASSERT_NULL(assertion_eval_a_ptr(&assertion_null_value));
+)
+
+ASSERTION_CASE(safety_ptr_not_null_pass,
+    MTEST_ASSERT_NOT_NULL(assertion_eval_a_ptr(&assertion_null_value));
+)
+
+ASSERTION_CASE(safety_ptr_not_null_fail,
+    MTEST_ASSERT_NOT_NULL(assertion_eval_a_ptr(NULL));
+)
+
+static int run_safety_case(const char *name,
+                           assertion_probe_fn_t fn,
+                           int expected_a,
+                           int expected_b,
+                           int expected_c,
+                           int expect_failed) {
+    int ok = 1;
+    mtest_state_t saved = mtest_g;
+
+    assertion_eval_reset();
+    memset(&mtest_g, 0, sizeof(mtest_g));
+    mtest_g.current_outcome = MTEST_OUTCOME_RUNNING;
+    mtest_g.current_phase = MTEST_PHASE_BODY;
+
+    fn();
+
+    if (!assertion_eval_counts_match(expected_a, expected_b, expected_c)) {
+        fprintf(stderr, "safety probe counts mismatch for %s\n", name);
+        ok = 0;
+    }
+
+    if (mtest_g.tests_discovered != 0 ||
+        mtest_g.tests_selected != 0 ||
+        mtest_g.tests_run != 0 ||
+        mtest_g.tests_passed != 0 ||
+        mtest_g.tests_failed != expect_failed ||
+        mtest_g.tests_skipped != 0 ||
+        mtest_g.tests_filtered_out != 0 ||
+        mtest_g.suites_entered != 0 ||
+        mtest_g.asserts_total != 1 ||
+        mtest_g.asserts_failed != expect_failed ||
+        mtest_g.current_test != NULL ||
+        mtest_g.current_suite != NULL ||
+        mtest_g.current_skip_reason != NULL ||
+        mtest_g.current_outcome != (expect_failed ? MTEST_OUTCOME_FAILED
+                                                  : MTEST_OUTCOME_RUNNING) ||
+        mtest_g.current_phase != MTEST_PHASE_BODY ||
+        mtest_g.current_failed != expect_failed) {
+        fprintf(stderr, "safety probe runner state mismatch for %s\n", name);
+        ok = 0;
+    }
+
+    mtest_g = saved;
+    return ok;
+}
+
+static int run_string_memory_pointer_safety_probe(void) {
+    int ok = 1;
+
+    if (!run_safety_case("str-eq-null-pass", safety_str_eq_null_pass, 1, 1, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_safety_case("str-eq-null-fail", safety_str_eq_null_fail, 1, 1, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_safety_case("str-contains-null-haystack-fail",
+                         safety_str_contains_null_haystack_fail, 1, 1, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_safety_case("str-contains-null-needle-fail",
+                         safety_str_contains_null_needle_fail, 1, 1, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_safety_case("str-contains-empty-needle-pass",
+                         safety_str_contains_empty_needle_pass, 1, 1, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_safety_case("mem-zero-len-null-pass",
+                         safety_mem_eq_zero_len_null_pass, 1, 1, 1, 0)) {
+        ok = 0;
+    }
+    if (!run_safety_case("mem-pass-once", safety_mem_eq_pass_once, 1, 1, 1, 0)) {
+        ok = 0;
+    }
+    if (!run_safety_case("mem-nonzero-null-fail",
+                         safety_mem_eq_nonzero_null_fail, 1, 1, 1, 1)) {
+        ok = 0;
+    }
+    if (!run_safety_case("mem-negative-len-fail",
+                         safety_mem_eq_negative_len_fail, 1, 1, 1, 1)) {
+        ok = 0;
+    }
+    if (!run_safety_case("ptr-null-pass", safety_ptr_null_pass, 1, 0, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_safety_case("ptr-null-fail", safety_ptr_null_fail, 1, 0, 0, 1)) {
+        ok = 0;
+    }
+    if (!run_safety_case("ptr-not-null-pass", safety_ptr_not_null_pass, 1, 0, 0, 0)) {
+        ok = 0;
+    }
+    if (!run_safety_case("ptr-not-null-fail", safety_ptr_not_null_fail, 1, 0, 0, 1)) {
+        ok = 0;
+    }
+
+    return ok;
+}
+
 static int32_t assertion_eval_a_i32(int32_t value) {
     assertion_eval_state.a++;
     return value;
@@ -1037,6 +1203,11 @@ int main(int argc, char **argv) {
     MTEST_SUITE_RUN(floats);
     MTEST_SUITE_RUN(fixtures);
     MTEST_SUITE_RUN(misc);
+    if (mtest_g.filter == NULL && !mtest_g.list_only && !mtest_g.stop_on_fail) {
+        if (!run_string_memory_pointer_safety_probe()) {
+            return 1;
+        }
+    }
     if (mtest_g.filter == NULL && !mtest_g.list_only && !mtest_g.stop_on_fail) {
         if (!run_typed_integer_boundary_probe()) {
             return 1;
